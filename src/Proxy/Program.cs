@@ -17,11 +17,6 @@ namespace Proxy
     {
         public static void Main(string[] args)
         {
-            // allow config options to be set using environment variables
-            var configuration = new ConfigurationBuilder()
-                .AddEnvironmentVariables()
-                .Build();
-
             // configure which port for Kestrel to listen on
             var port = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_HOST_PORT") ?? "5000";
 
@@ -42,7 +37,6 @@ namespace Proxy
                     // tell Kestrel to listen on all ip addresses at the specififed port
                     options.Listen(IPAddress.Any, int.Parse(port));
                 })
-                .UseConfiguration(configuration)
                 .Configure(app =>
                 {
                     // every http request will be handled by this lambda
