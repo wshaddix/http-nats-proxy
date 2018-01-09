@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using NATS.Client;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Proxy
 {
@@ -29,6 +30,12 @@ namespace Proxy
             // create a connection to the NATS server
             var connectionFactory = new ConnectionFactory();
             var connection = connectionFactory.CreateConnection(natsUrl);
+
+            // create a camel case contract resolver so that our NatsMessage serializes to camelCase names
+            var serializerSettings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver()
+            };
 
             // configure the host
             var host = new WebHostBuilder()
@@ -51,7 +58,7 @@ namespace Proxy
                             var natsMessage = ExtractMessage(context.Request);
 
                             // serialize the natsMessage so that we can send it to NATS
-                            var serializedMessage = JsonConvert.SerializeObject(natsMessage);
+                            var serializedMessage = JsonConvert.SerializeObject(natsMessage, serializerSettings);
 
                             // send the message to NATS and wait for a reply
                             var reply = await connection.RequestAsync(subject,
