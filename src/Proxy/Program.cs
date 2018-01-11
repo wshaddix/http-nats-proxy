@@ -1,124 +1,100 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Text;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using NATS.Client;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+using System;
+using System.Net;
 
 namespace Proxy
 {
     public class Program
     {
+        private static ProxyConfig _config;
+        private static IWebHost _host;
+
         public static void Main(string[] args)
         {
-            // configure which port for Kestrel to listen on
-            var port = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_HOST_PORT") ?? "5000";
-
-            // configure the url to the NATS server
-            var natsUrl = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_NAT_URL") ?? "nats://localhost:4222";
-
-            // configure how long we are willing to wait for a reply after sending the message to the NATS server
-            var timeout = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_WAIT_TIMEOUT_SECONDS") ?? "10";
+            // capture the runtime configuration settings
+            Configure();
 
             // create a connection to the NATS server
-            var connectionFactory = new ConnectionFactory();
-            var connection = connectionFactory.CreateConnection(natsUrl);
-
-            // create a camel case contract resolver so that our NatsMessage serializes to camelCase names
-            var serializerSettings = new JsonSerializerSettings
-            {
-                ContractResolver = new CamelCasePropertyNamesContractResolver()
-            };
+            ConnectToNats();
 
             // configure the host
-            var host = new WebHostBuilder()
+            ConfigureHost();
+
+            // run the host
+            _host.Run();
+
+            // run the host
+            _host.Run();
+        }
+
+        private static void Configure()
+        {
+            Console.WriteLine("Reading configuration values...");
+
+            _config = new ProxyConfig
+            {
+                // configure which port for Kestrel to listen on
+                Port = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_HOST_PORT") ?? "5000",
+
+                // configure the url to the NATS server
+                NatsUrl = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_NAT_URL") ?? "nats://localhost:4222",
+
+                // configure how long we are willing to wait for a reply after sending the message to the NATS server
+                Timeout = 1000 * int.Parse(Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_WAIT_TIMEOUT_SECONDS") ?? "10"),
+
+                // configure the http response status codes
+                HeadStatusCode = int.Parse(Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_HEAD_STATUS_CODE") ?? "200"),
+                PutStatusCode = int.Parse(Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_PUT_STATUS_CODE") ?? "201"),
+                GetStatusCode = int.Parse(Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_GET_STATUS_CODE") ?? "200"),
+                PatchStatusCode = int.Parse(Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_PATCH_STATUS_CODE") ?? "201"),
+                PostStatusCode = int.Parse(Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_POST_STATUS_CODE") ?? "201"),
+                DeleteStatusCode = int.Parse(Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_DELETE_STATUS_CODE") ?? "204"),
+
+                // configure the content type of the http response to be used
+                ContentType = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_CONTENT_TYPE") ?? "application/json; charset=utf-8",
+
+                // configure which subject to publish metrics to
+                MetricsSubject = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_METRICS_SUBJECT") ?? string.Empty,
+
+                // configure which subject to publish logs to
+                LogsSubject = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_LOGS_SUBJECT") ?? string.Empty,
+
+                // configure if the proxy should inject a trace header
+                TraceHeaderName = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_TRACE_HEADER") ?? string.Empty
+            };
+
+            Console.WriteLine("Configured.");
+        }
+
+        private static void ConfigureHost()
+        {
+            // create the request handler
+            var requestHandler = new RequestHandler(_config);
+
+            _host = new WebHostBuilder()
                 .UseKestrel(options =>
                 {
                     // tell Kestrel to listen on all ip addresses at the specififed port
-                    options.Listen(IPAddress.Any, int.Parse(port));
+                    options.Listen(IPAddress.Any, int.Parse(_config.Port));
                 })
                 .Configure(app =>
                 {
                     // every http request will be handled by this lambda
-                    app.Run(async context =>
-                    {
-                        try
-                        {
-                            // create a NATS subject from the request method and path
-                            var subject = ExtractSubject(context.Request.Method, context.Request.Path.Value);
-
-                            // create the body of the NATS message from the request headers, cookies, query params and body
-                            var natsMessage = ExtractMessage(context.Request);
-
-                            // serialize the natsMessage so that we can send it to NATS
-                            var serializedMessage = JsonConvert.SerializeObject(natsMessage, serializerSettings);
-
-                            // send the message to NATS and wait for a reply
-                            var reply = await connection.RequestAsync(subject,
-                                Encoding.UTF8.GetBytes(serializedMessage), int.Parse(timeout) * 1000);
-
-                            // convert the response to a string
-                            var response = Encoding.UTF8.GetString(reply.Data);
-
-                            // return the response to the api client
-                            await context.Response.WriteAsync(response);
-                        }
-                        catch (Exception ex)
-                        {
-                            // set the status code to 500 (internal server error)
-                            context.Response.StatusCode = 500;
-
-                            // create an anonymous type to hold the error details
-                            var response = new
-                            {
-                                ErrorMessage = ex.GetBaseException().Message
-                            };
-
-                            // write the response as a json formatted response
-                            await context.Response.WriteAsync(JsonConvert.SerializeObject(response));
-                        }
-                    });
+                    app.Run(requestHandler.HandleAsync);
                 })
                 .Build();
-
-            // run the host
-            host.Run();
         }
 
-        private static NatsMessage ExtractMessage(HttpRequest request)
+        private static void ConnectToNats()
         {
-            string body;
+            Console.WriteLine($"Attempting to connect to NATS server at: {_config.NatsUrl}");
 
-            // if there is a body with the request then read it
-            using (var reader = new StreamReader(request.Body, Encoding.UTF8))
-            {
-                body = reader.ReadToEnd();
-            }
+            var connectionFactory = new ConnectionFactory();
+            _config.NatsConnection = connectionFactory.CreateConnection(_config.NatsUrl);
 
-            var natsMessage = new NatsMessage
-            {
-                Headers = request.Headers.Select(h => new KeyValuePair<string, string>(h.Key, h.Value)),
-                Cookies = request.Cookies.Select(c => new KeyValuePair<string, string>(c.Key, c.Value)),
-                QueryParams = request.Query.Select(q => new KeyValuePair<string, string>(q.Key, q.Value)),
-                Body = body
-            };
-
-            return natsMessage;
-        }
-
-        private static string ExtractSubject(string method, string path)
-        {
-            var postfix = path.Replace('/', '.');
-            var subject = string.Concat(method, postfix).ToLower();
-
-            return subject;
+            Console.WriteLine("Connected to NATS server.");
         }
     }
 }

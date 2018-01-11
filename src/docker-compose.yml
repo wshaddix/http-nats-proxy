@@ -11,8 +11,27 @@ services:
       - HTTP_NATS_PROXY_HOST_PORT=5000
       - HTTP_NATS_PROXY_NAT_URL=nats://nats:4222
       - HTTP_NATS_PROXY_WAIT_TIMEOUT_SECONDS=10
+      - HTTP_NATS_PROXY_METRICS_SUBJECT=post.metrics
+      - HTTP_NATS_PROXY_LOGS_SUBJECT=post.logs
+      - HTTP_NATS_PROXY_TRACE_HEADER=x-trace-id
   test-microservice:
     build: ./TestMicroservice
+    depends_on:
+      - nats
+    environment:
+      - HTTP_NATS_PROXY_NAT_URL=nats://nats:4222
+  metrics-microservice:
+    build: 
+      context: .
+      dockerfile: Dockerfile.MetricsMicroservice
+    depends_on:
+      - nats
+    environment:
+      - HTTP_NATS_PROXY_NAT_URL=nats://nats:4222
+  logging-microservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.LoggingMicroservice
     depends_on:
       - nats
     environment:
@@ -21,3 +40,4 @@ services:
     image: nats:1.0.4
     ports:
       - "8222:8222"
+      - "4222:4222"
