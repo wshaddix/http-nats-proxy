@@ -39,7 +39,7 @@ namespace MetricsMicroservice
         private static void PostMetric(object sender, MsgHandlerEventArgs e)
         {
             // artificial processing time
-            Thread.Sleep(5000);
+            Thread.Sleep(1000);
 
             // extract the metric from the nats message
             var metric = Encoding.UTF8.GetString(e.Message.Data);

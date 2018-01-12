@@ -39,7 +39,7 @@ namespace LoggingMicroservice
         private static void PostLog(object sender, MsgHandlerEventArgs e)
         {
             // artificial processing time
-            Thread.Sleep(5000);
+            Thread.Sleep(1000);
 
             // extract the metric from the nats message
             var log = Encoding.UTF8.GetString(e.Message.Data);
