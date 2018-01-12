@@ -192,7 +192,8 @@ namespace Proxy
             var metrics = new
             {
                 subject = subject,
-                timeInMs = timeMs
+                executionTimeMs = timeMs,
+                occurredAtUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };
             var metricsMsg = JsonConvert.SerializeObject(metrics, _config.JsonSerializerSettings);
             _config.NatsConnection.Publish(_config.MetricsSubject, Encoding.UTF8.GetBytes(metricsMsg));
