@@ -24,9 +24,6 @@ namespace Proxy
 
             // run the host
             _host.Run();
-
-            // run the host
-            _host.Run();
         }
 
         private static void Configure()

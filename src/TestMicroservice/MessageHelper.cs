@@ -4,19 +4,25 @@ using System.Linq;
 using System.Text;
 using NATS.Client;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
-namespace Common
+namespace TestMicroservice
 {
     public class MessageHelper
     {
-        public static NatsMessage GetNatsMessage(Msg msg)
+        private static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
         {
-            return JsonConvert.DeserializeObject<NatsMessage>(Encoding.UTF8.GetString(msg.Data));
-        }
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        };
 
         public static T Deserialize<T>(string data)
         {
             return JsonConvert.DeserializeObject<T>(data);
+        }
+
+        public static NatsMessage GetNatsMessage(Msg msg)
+        {
+            return JsonConvert.DeserializeObject<NatsMessage>(Encoding.UTF8.GetString(msg.Data));
         }
 
         public static string GetValue(string key, IEnumerable<KeyValuePair<string, string>> parameters)
@@ -29,6 +35,11 @@ namespace Common
 
             // if we didn't find a match then just return an empty string
             return string.IsNullOrWhiteSpace(match.Key) ? string.Empty : match.Value;
+        }
+
+        public static byte[] PackageResponse(object data)
+        {
+            return Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data, SerializerSettings));
         }
     }
 }

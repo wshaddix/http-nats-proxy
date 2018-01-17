@@ -21,17 +21,13 @@ services:
     environment:
       - HTTP_NATS_PROXY_NAT_URL=nats://nats:4222
   metrics-microservice:
-    build: 
-      context: .
-      dockerfile: Dockerfile.MetricsMicroservice
+    build: ./MetricsMicroservice
     depends_on:
       - nats
     environment:
       - HTTP_NATS_PROXY_NAT_URL=nats://nats:4222
   logging-microservice:
-    build:
-      context: .
-      dockerfile: Dockerfile.LoggingMicroservice
+    build: ./LoggingMicroservice
     depends_on:
       - nats
     environment:

@@ -26,5 +26,11 @@ namespace Proxy
         public string ResponseContentType { get; set; }
         public int ResponseStatusCode { get; set; }
         public string Subject { get; set; }
+
+        public NatsMessage()
+        {
+            // default the response status code to an invalid value for comparison later on when the response is being processed by the RequestHandler
+            ResponseStatusCode = -1;
+        }
     }
 }

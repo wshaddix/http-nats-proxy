@@ -29,7 +29,10 @@ When an http request is received, the http-nats-proxy will extract the headers, 
 		{"key": '', "value": ''}.
 		{"key": '', "value": ''}
 	],
-	"body": ''
+	"body": '',
+	"responseStatusCode": -1,
+	"response": '',
+	"errorMessage", ''
 }
 ```
 
@@ -80,11 +83,12 @@ This will run the http-nats-proxy in a container alongside a NATS server and a t
 
 ```
 GET http://localhost:5000/test/v1/customer
-PUT http://localhost:5000/test/v1/customer
+PUT http://localhost:5000/test/v1/customer  <-- will override the response status code to be 200 (example of response status code overriding)
 POST http://localhost:5000/test/v1/customer
+DELETE http://localhost:5000/test/v1/customer <-- will return an error stating that the customer cannot be deleted (example of returning an error from your microservice)
 ```
 
-Additionally, if configured for metrics, logging and tracing you will see the output of those microservices as well in your terminal. This is for demo purposes only. There is a 1 second delay in the logging and metrics microservices just to simulate work.
+Additionally, if configured for metrics, logging and tracing you will see the output of those microservices as well in your terminal. This is for demo purposes only. There is a 1/2 second delay in the logging and metrics microservices just to simulate work.
 
 ## Creating your own docker image
 The http-nats-proxy has a `Dockerfile` where you can build your own docker images by running:
@@ -106,3 +110,6 @@ docker-compose -f docker-compose-nats-only.yml up
 2. Code your microservice and have it connect to nats at `nats://localhost:4222`
 3. Once your microservice is ready to test, send in http requests through CURL, Postman or whatever means you want to the http-nats-proxy at `http://localhost:5000`
 
+## Responsibilities of your microservices
+
+In order to control what gets returned from the http-nats-proxy, your microservice has to set the `response` property of the NATS message that you receive when you subscribe to a NATS subject. You should return the *entire* NATS message. You may optionally set the `responseStatusCode` and the `errorMessage` properties if an error occurs while you are processing the message. The nats-http-proxy will honor the `responseStatusCode` if it is set and will also format and return an error response if the `errorMessage` property has been set.

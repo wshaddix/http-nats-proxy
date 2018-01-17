@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Common
+namespace LoggingMicroservice
 {
     public sealed class NatsMessage
     {

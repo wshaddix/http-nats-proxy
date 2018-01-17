@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
+using NATS.Client;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -51,19 +52,20 @@ namespace Proxy
                 // send the message to NATS and wait for a reply
                 var reply = await _config.NatsConnection.RequestAsync(subject, natsMessage.ToBytes(_config.JsonSerializerSettings), _config.Timeout);
 
-                // convert the response to a string
-                var response = Encoding.UTF8.GetString(reply.Data);
-
-                // add the response to the natsMessage for logging
-                natsMessage.Response = response;
+                // convert the reply body back to a nats message
+                natsMessage = ExtractMessageFromReply(reply);
 
                 // set the response status code
-                var statusCode = DetermineStatusCode(context);
-                context.Response.StatusCode = statusCode;
-                natsMessage.ResponseStatusCode = statusCode;
+                context.Response.StatusCode = natsMessage.ResponseStatusCode == -1 ? DetermineStatusCode(context) : natsMessage.ResponseStatusCode;
+
+                // if the reply was an error, we need to throw the exception so it will be handled
+                if (!string.IsNullOrWhiteSpace(natsMessage.ErrorMessage))
+                {
+                    throw new ApplicationException(natsMessage.ErrorMessage);
+                }
 
                 // return the response to the api client
-                await context.Response.WriteAsync(response);
+                await context.Response.WriteAsync(natsMessage.Response);
 
                 // if we're capturing metrics we need to get the ellapsed time and publish it
                 if (_config.PublishMetrics)
@@ -120,6 +122,11 @@ namespace Proxy
             };
 
             return natsMessage;
+        }
+
+        private static NatsMessage ExtractMessageFromReply(Msg reply)
+        {
+            return JsonConvert.DeserializeObject<NatsMessage>(Encoding.UTF8.GetString(reply.Data));
         }
 
         private static string ExtractSubject(string method, string path)

@@ -2,7 +2,6 @@
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 
 namespace TestMicroservice
@@ -14,15 +13,34 @@ namespace TestMicroservice
 
         private static IConnection _connection;
 
+        private static void DeleteCustomer(object sender, MsgHandlerEventArgs e)
+        {
+            // deserialize the NATS message
+            var msg = MessageHelper.GetNatsMessage(e.Message);
+
+            // let's simulate an error
+            msg.ErrorMessage = "You cannot delete this customer because there are unpaid invoices";
+
+            // send the NATS message (with the error message now set) back to the caller
+            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
+        }
+
         private static void GetCustomer(object sender, MsgHandlerEventArgs e)
         {
+            // deserialize the NATS message
+            var msg = MessageHelper.GetNatsMessage(e.Message);
+
+            // create a reply
             var result = new
             {
-                reply = "I got the GETs message"
+                reply = "I got the GET message"
             };
-            var reply = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(result));
 
-            _connection.Publish(e.Message.Reply, reply);
+            // store the reply on the NATS message
+            msg.Response = JsonConvert.SerializeObject(result);
+
+            // send the NATS message (with the response now set) back to the caller
+            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
         }
 
         private static void Main(string[] args)
@@ -39,7 +57,8 @@ namespace TestMicroservice
             {
                 _connection.SubscribeAsync("get.test.v1.customer", "test-microservice-group", GetCustomer),
                 _connection.SubscribeAsync("post.test.v1.customer", "test-microservice-group", PostCustomer),
-                _connection.SubscribeAsync("put.test.v1.customer", "test-microservice-group", PutCustomer)
+                _connection.SubscribeAsync("put.test.v1.customer", "test-microservice-group", PutCustomer),
+                 _connection.SubscribeAsync("delete.test.v1.customer", "test-microservice-group", DeleteCustomer)
             };
 
             // start the subscriptions
@@ -52,24 +71,41 @@ namespace TestMicroservice
 
         private static void PostCustomer(object sender, MsgHandlerEventArgs e)
         {
+            // deserialize the NATS message
+            var msg = MessageHelper.GetNatsMessage(e.Message);
+
+            // create a reply
             var result = new
             {
-                reply = "I got the POSTs message"
+                reply = "I got the POST message"
             };
-            var reply = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(result));
 
-            _connection.Publish(e.Message.Reply, reply);
+            // store the reply on the NATS message
+            msg.Response = JsonConvert.SerializeObject(result);
+
+            // send the NATS message (with the response now set) back to the caller
+            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
         }
 
         private static void PutCustomer(object sender, MsgHandlerEventArgs e)
         {
+            // deserialize the NATS message
+            var msg = MessageHelper.GetNatsMessage(e.Message);
+
+            // create a reply
             var result = new
             {
-                reply = "I got the PUTs message"
+                reply = "I got the PUT message"
             };
-            var reply = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(result));
 
-            _connection.Publish(e.Message.Reply, reply);
+            // store the reply on the NATS message
+            msg.Response = JsonConvert.SerializeObject(result);
+
+            // lets also override the response status code from the default 201
+            msg.ResponseStatusCode = 200;
+
+            // send the NATS message (with the response now set) back to the caller
+            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
         }
     }
 }
