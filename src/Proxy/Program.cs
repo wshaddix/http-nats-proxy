@@ -8,29 +8,29 @@ namespace Proxy
 {
     public class Program
     {
-        private static ProxyConfig _config;
+        private static ProxyConfiguration _config;
         private static IWebHost _host;
 
         public static void Main(string[] args)
         {
             // capture the runtime configuration settings
-            Configure();
+            ConfigureEnvironment();
 
             // create a connection to the NATS server
             ConnectToNats();
 
             // configure the host
-            ConfigureHost();
+            ConfigureWebHost();
 
             // run the host
             _host.Run();
         }
 
-        private static void Configure()
+        private static void ConfigureEnvironment()
         {
             Console.WriteLine("Reading configuration values...");
 
-            _config = new ProxyConfig
+            _config = new ProxyConfiguration
             {
                 // configure which port for Kestrel to listen on
                 Port = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_HOST_PORT") ?? "5000",
@@ -52,20 +52,16 @@ namespace Proxy
                 // configure the content type of the http response to be used
                 ContentType = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_CONTENT_TYPE") ?? "application/json; charset=utf-8",
 
-                // configure which subject to publish metrics to
-                MetricsSubject = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_METRICS_SUBJECT") ?? string.Empty,
-
-                // configure which subject to publish logs to
-                LogsSubject = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_LOGS_SUBJECT") ?? string.Empty,
-
-                // configure if the proxy should inject a trace header
-                TraceHeaderName = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_TRACE_HEADER") ?? string.Empty
+                // capture the request pipeline config file
+                PipelineConfigFile = Environment.GetEnvironmentVariable("HTTP_NATS_PROXY_REQUEST_PIPELINE_CONFIG_FILE") ?? string.Empty
             };
+
+            _config.Build();
 
             Console.WriteLine("Configured.");
         }
 
-        private static void ConfigureHost()
+        private static void ConfigureWebHost()
         {
             // create the request handler
             var requestHandler = new RequestHandler(_config);
@@ -78,7 +74,7 @@ namespace Proxy
                 })
                 .Configure(app =>
                 {
-                    // every http request will be handled by this lambda
+                    // every http request will be handled by our request handler
                     app.Run(requestHandler.HandleAsync);
                 })
                 .Build();

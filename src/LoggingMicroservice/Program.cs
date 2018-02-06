@@ -25,7 +25,7 @@ namespace LoggingMicroservice
             // setup a subscription to the "test" queues using a queue group for this microservice
             var subscriptions = new List<IAsyncSubscription>
             {
-                _connection.SubscribeAsync("post.logs", "logging-microservice-group", PostLog),
+                _connection.SubscribeAsync("pipeline.logging", "logging-microservice-group", PostLog),
             };
 
             // start the subscriptions
@@ -38,9 +38,6 @@ namespace LoggingMicroservice
 
         private static void PostLog(object sender, MsgHandlerEventArgs e)
         {
-            // artificial processing time
-            Thread.Sleep(500);
-
             // extract the metric from the nats message
             var log = Encoding.UTF8.GetString(e.Message.Data);
 

@@ -1,7 +1,6 @@
 ﻿using NATS.Client;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 
 namespace MetricsMicroservice
@@ -25,26 +24,32 @@ namespace MetricsMicroservice
             // setup a subscription to the "test" queues using a queue group for this microservice
             var subscriptions = new List<IAsyncSubscription>
             {
-                _connection.SubscribeAsync("post.metrics", "metrics-microservice-group", PostMetric),
+                _connection.SubscribeAsync("pipeline.metrics", "metrics-microservice-group", PostMetric),
             };
 
             // start the subscriptions
             subscriptions.ForEach(s => s.Start());
 
             // keep this console app running
-            Console.WriteLine($"Connected to NATS at: {natsUrl}\r\nWaiting for messages...");
+            Console.WriteLine($"Metrics Microservice connected to NATS at: {natsUrl}\r\nWaiting for messages...");
             ManualResetEvent.WaitOne();
         }
 
         private static void PostMetric(object sender, MsgHandlerEventArgs e)
         {
-            // artificial processing time
-            Thread.Sleep(500);
+            // deserialize the NATS message
+            var msg = MessageHelper.GetNatsMessage(e.Message);
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            // extract the metric from the nats message
-            var metric = Encoding.UTF8.GetString(e.Message.Data);
+            Console.WriteLine($"{DateTime.Now.ToShortTimeString()}: Message Called: {msg.Subject} Total Execution Time (ms): {now - msg.StartedOnUtc}");
+            Console.WriteLine("\tBreakdown:");
 
-            Console.WriteLine($"Received the metric:\r\n{metric}");
+            msg.CallTimings.ForEach(t =>
+                                    {
+                                        Console.WriteLine($"\t\tSubject: {t.Item1} Pattern: {t.Item2}, Execution Time (ms): {t.Item3}");
+                                    });
+
+            Console.WriteLine(new string('-', 120));
         }
     }
 }
