@@ -1,7 +1,9 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
-namespace LoggingMicroservice
+namespace AuthenticationPipelineStep
 {
     public sealed class NatsMessage
     {
@@ -18,6 +20,7 @@ namespace LoggingMicroservice
         public string ResponseContentType { get; set; }
         public List<KeyValuePair<string, string>> ResponseHeaders { get; set; }
         public int ResponseStatusCode { get; set; }
+        public bool ShouldTerminateRequest { get; set; }
         public long StartedOnUtc { get; set; }
         public string Subject { get; set; }
 
@@ -46,6 +49,15 @@ namespace LoggingMicroservice
         public void MarkComplete()
         {
             CompletedOnUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        }
+    }
+
+    internal static class NatsMessageExtensions
+    {
+        internal static byte[] ToBytes(this NatsMessage msg, JsonSerializerSettings serializerSettings)
+        {
+            var serializedMessage = JsonConvert.SerializeObject(msg, serializerSettings);
+            return Encoding.UTF8.GetBytes(serializedMessage);
         }
     }
 }

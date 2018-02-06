@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Primitives;
 using NATS.Client;
 using Newtonsoft.Json;
 using System;
@@ -14,127 +13,168 @@ namespace Proxy
 {
     public class RequestHandler
     {
-        private readonly ProxyConfig _config;
+        private readonly ProxyConfiguration _config;
 
-        public RequestHandler(ProxyConfig config)
+        public RequestHandler(ProxyConfiguration config)
         {
             _config = config;
         }
 
         public async Task HandleAsync(HttpContext context)
         {
-            NatsMessage natsMessage = null;
-            Stopwatch stopwatch = null;
+            // create a new message
+            var message = new NatsMessage(_config.Host, _config.ContentType);
 
             try
             {
-                // if we're capturing metrics then we need to time the entire pipeline
-                if (_config.PublishMetrics)
-                {
-                    stopwatch = Stopwatch.StartNew();
-                }
-
-                // inject a trace header if we are configured to do so
-                ProcessTraceHeader(context);
+                // set the content type of the http response
+                context.Response.ContentType = _config.ContentType;
 
                 // create a NATS subject from the request method and path
-                var subject = ExtractSubject(context.Request.Method, context.Request.Path.Value);
+                message.Subject = ExtractSubject(context.Request.Method, context.Request.Path.Value);
 
-                // create the body of the NATS message from the request headers, cookies, query params and body
-                natsMessage = ExtractMessage(context.Request);
+                // parse the request headers, cookies, query params and body and put them on the message
+                ParseHttpRequest(context.Request, message);
 
-                // add metadata to the nats message for logging purposes
-                natsMessage.Host = _config.Host;
-                natsMessage.Subject = subject;
-                context.Response.ContentType = _config.ContentType;
-                natsMessage.ResponseContentType = _config.ContentType;
+                // execute the incoming request pipeline in order
+                var sw = Stopwatch.StartNew();
+                foreach (var step in _config.IncomingPipeline.Steps)
+                {
+                    // execute the step
+                    sw.Restart();
+                    await ExecuteStep(message, step);
+                    sw.Stop();
 
-                // send the message to NATS and wait for a reply
-                var reply = await _config.NatsConnection.RequestAsync(subject, natsMessage.ToBytes(_config.JsonSerializerSettings), _config.Timeout);
+                    // record how long the step took to execute
+                    message.CallTimings.Add((step.Subject, step.Pattern, sw.ElapsedMilliseconds));
 
-                // convert the reply body back to a nats message
-                natsMessage = ExtractMessageFromReply(reply);
+                    // if the step requested termination we should stop processing steps
+                    if (message.ShouldTerminateRequest)
+                    {
+                        break;
+                    }
+                }
+
+                // execute the outgoing request pipeline in descending order
+                foreach (var step in _config.OutgoingPipeline.Steps)
+                {
+                    sw.Restart();
+                    await ExecuteStep(message, step);
+                    sw.Stop();
+
+                    // record how long the step took to execute
+                    message.CallTimings.Add((step.Subject, step.Pattern, sw.ElapsedMilliseconds));
+                }
 
                 // set the response status code
-                context.Response.StatusCode = natsMessage.ResponseStatusCode == -1 ? DetermineStatusCode(context) : natsMessage.ResponseStatusCode;
+                context.Response.StatusCode = message.ResponseStatusCode == -1 ? DetermineStatusCode(context) : message.ResponseStatusCode;
 
-                // if the reply was an error, we need to throw the exception so it will be handled
-                if (!string.IsNullOrWhiteSpace(natsMessage.ErrorMessage))
-                {
-                    throw new ApplicationException(natsMessage.ErrorMessage);
-                }
+                // set any response headers
+                message.ResponseHeaders.ForEach(h => context.Response.GetTypedHeaders().Append(h.Key, h.Value));
+
+                // capture the execution time that it took to process the message
+                message.MarkComplete();
 
                 // return the response to the api client
-                await context.Response.WriteAsync(natsMessage.Response);
-
-                // if we're capturing metrics we need to get the ellapsed time and publish it
-                if (_config.PublishMetrics)
+                if (!string.IsNullOrWhiteSpace(message.Response))
                 {
-                    PublishTimingMetric(stopwatch, natsMessage, subject);
-                }
-
-                // if we're logging then publish the completed natsMessage
-                if (_config.PublishLogs)
-                {
-                    LogNatsMessage(natsMessage);
+                    await context.Response.WriteAsync(message.Response);
                 }
             }
             catch (Exception ex)
             {
                 // set the status code to 500 (internal server error)
                 context.Response.StatusCode = 500;
-                natsMessage.ResponseStatusCode = 500;
-                natsMessage.ErrorMessage = ex.GetBaseException().Message;
+                message.ResponseStatusCode = 500;
+                message.ErrorMessage = ex.GetBaseException().Message;
 
-                // create an anonymous type to hold the error details
-                var response = new
+                object response;
+
+                if (ex is StepException stepException)
                 {
-                    ErrorMessage = natsMessage.ErrorMessage
-                };
+                    response = new
+                    {
+                        stepException.Subject,
+                        stepException.Pattern,
+                        Message = stepException.Msg
+                    };
+                }
+                else
+                {
+                    response = new
+                    {
+                        message.ErrorMessage
+                    };
+                }
+
+                // capture the execution time that it took to process the message
+                message.MarkComplete();
 
                 // write the response as a json formatted response
                 await context.Response.WriteAsync(JsonConvert.SerializeObject(response, _config.JsonSerializerSettings));
-
-                // if we're logging then publish the completed natsMessage
-                if (_config.PublishLogs)
-                {
-                    LogNatsMessage(natsMessage);
-                }
             }
-        }
-
-        private static NatsMessage ExtractMessage(HttpRequest request)
-        {
-            string body;
-
-            // if there is a body with the request then read it
-            using (var reader = new StreamReader(request.Body, Encoding.UTF8))
-            {
-                body = reader.ReadToEnd();
-            }
-
-            var natsMessage = new NatsMessage
-            {
-                Headers = request.Headers.Select(h => new KeyValuePair<string, string>(h.Key, h.Value)),
-                Cookies = request.Cookies.Select(c => new KeyValuePair<string, string>(c.Key, c.Value)),
-                QueryParams = request.Query.Select(q => new KeyValuePair<string, string>(q.Key, q.Value)),
-                Body = body
-            };
-
-            return natsMessage;
         }
 
         private static NatsMessage ExtractMessageFromReply(Msg reply)
         {
+            // the NATS msg.Data property is a json encoded instance of our NatsMessage so we convert it from a byte[] to a string and then deserialize
+            // it from json
             return JsonConvert.DeserializeObject<NatsMessage>(Encoding.UTF8.GetString(reply.Data));
         }
 
         private static string ExtractSubject(string method, string path)
         {
-            var postfix = path.Replace('/', '.');
-            var subject = string.Concat(method, postfix).ToLower();
+            // replace all forward slashes with periods in the http request path
+            var subjectPath = path.Replace('/', '.');
 
-            return subject;
+            // the subject is the http method followed by the path all lowercased
+            return string.Concat(method, subjectPath).ToLower();
+        }
+
+        private static NatsMessage MergeMessageProperties(NatsMessage message, NatsMessage responseMessage)
+        {
+            // we don't want to lose data on the original message if a microservice fails to return all of the data so we're going to just copy
+            // non-null properties from the responseMessage onto the message
+            message.ShouldTerminateRequest = responseMessage.ShouldTerminateRequest;
+            message.ResponseStatusCode = responseMessage.ResponseStatusCode;
+            message.Response = responseMessage.Response;
+            message.ErrorMessage = responseMessage.ErrorMessage ?? message.ErrorMessage;
+
+            // we want to concatenate the extended properties as each step in the pipeline may be adding information
+            message.ExtendedProperties = message.ExtendedProperties
+                                           .Concat(responseMessage.ExtendedProperties)
+                                           .ToDictionary(e => e.Key, e => e.Value);
+
+            // we want to add any request headers that the pipeline step could have added
+            message.RequestHeaders = message.RequestHeaders
+                                            .Concat(responseMessage.RequestHeaders)
+                                            .ToList();
+
+            // we want to add any response headers that the pipeline step could have added
+            message.ResponseHeaders = message.ResponseHeaders
+                                            .Concat(responseMessage.ResponseHeaders)
+                                            .ToList();
+
+            // return the merged message
+            return message;
+        }
+
+        private static void ParseHttpRequest(HttpRequest request, NatsMessage message)
+        {
+            // if there is a body with the request then read it
+            using (var reader = new StreamReader(request.Body, Encoding.UTF8))
+            {
+                message.Body = reader.ReadToEnd();
+            }
+
+            // parse the headers
+            message.RequestHeaders = request.Headers.Select(h => new KeyValuePair<string, string>(h.Key, h.Value)).ToList();
+
+            // parse the cookies
+            message.Cookies = request.Cookies.Select(c => new KeyValuePair<string, string>(c.Key, c.Value)).ToList();
+
+            // parse the query string parameters
+            message.QueryParams = request.Query.Select(q => new KeyValuePair<string, string>(q.Key, q.Value)).ToList();
         }
 
         private int DetermineStatusCode(HttpContext context)
@@ -170,40 +210,34 @@ namespace Proxy
             return statusCode;
         }
 
-        private void LogNatsMessage(NatsMessage natsMessage)
+        private async Task ExecuteStep(NatsMessage message, Step step)
         {
-            _config.NatsConnection.Publish(_config.LogsSubject, natsMessage.ToBytes(_config.JsonSerializerSettings));
-        }
+            // the subject is the step's configured subject unless it is an '*' in which case it's the microservice itself
+            var subject = step.Subject.Equals("*") ? message.Subject : step.Subject;
 
-        private void ProcessTraceHeader(HttpContext context)
-        {
-            if (_config.AddTraceHeader)
+            try
             {
-                // add the trace header only if it does not already exist
-                if (!context.Request.Headers.ContainsKey(_config.TraceHeaderName))
+                // if the step pattern is "publish" then do a fire-and-forget NATS call, otherwise to a request/response
+                if (step.Pattern.Equals("publish", StringComparison.OrdinalIgnoreCase))
                 {
-                    context.Request.Headers.Add(new KeyValuePair<string, StringValues>(_config.TraceHeaderName,
-                                                                                       Guid.NewGuid().ToString("N")));
+                    _config.NatsConnection.Publish(subject, message.ToBytes(_config.JsonSerializerSettings));
+                }
+                else
+                {
+                    // call the step and wait for the response
+                    var response = await _config.NatsConnection.RequestAsync(subject, message.ToBytes(_config.JsonSerializerSettings), _config.Timeout);
+
+                    // extract the response message
+                    var responseMessage = ExtractMessageFromReply(response);
+
+                    // merge the response into our original nats message
+                    MergeMessageProperties(message, responseMessage);
                 }
             }
-        }
-
-        private void PublishTimingMetric(Stopwatch stopwatch, NatsMessage natsMessage, string subject)
-        {
-            stopwatch?.Stop();
-            var timeMs = stopwatch?.ElapsedMilliseconds;
-
-            // add the call time to the natsMessage for logging purposes
-            natsMessage.ExecutionTimeMs = timeMs;
-
-            var metrics = new
+            catch (Exception ex)
             {
-                subject = subject,
-                executionTimeMs = timeMs,
-                occurredAtUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            };
-            var metricsMsg = JsonConvert.SerializeObject(metrics, _config.JsonSerializerSettings);
-            _config.NatsConnection.Publish(_config.MetricsSubject, Encoding.UTF8.GetBytes(metricsMsg));
+                throw new StepException(subject, step.Pattern, ex.GetBaseException().Message);
+            }
         }
     }
 }

@@ -65,7 +65,7 @@ namespace TestMicroservice
             subscriptions.ForEach(s => s.Start());
 
             // keep this console app running
-            Console.WriteLine($"Connected to NATS at: {natsUrl}\r\nWaiting for messages...");
+            Console.WriteLine($"Test Microservice connected to NATS at: {natsUrl}\r\nWaiting for messages...");
             ManualResetEvent.WaitOne();
         }
 

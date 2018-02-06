@@ -1,7 +1,9 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
-namespace LoggingMicroservice
+namespace TraceHeaderPipelineStep
 {
     public sealed class NatsMessage
     {
@@ -46,6 +48,15 @@ namespace LoggingMicroservice
         public void MarkComplete()
         {
             CompletedOnUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        }
+    }
+
+    internal static class NatsMessageExtensions
+    {
+        internal static byte[] ToBytes(this NatsMessage msg, JsonSerializerSettings serializerSettings)
+        {
+            var serializedMessage = JsonConvert.SerializeObject(msg, serializerSettings);
+            return Encoding.UTF8.GetBytes(serializedMessage);
         }
     }
 }
