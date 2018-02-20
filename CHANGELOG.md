@@ -11,3 +11,7 @@
 **1.0.0**
 
 * added pipeline feature and refactored the solution to have working examples of logging, metrics, authentiation and trace header injection.
+
+**1.0.1**
+
+* added logging to the request handler so that it's obvious when traffic is coming into the http-nats-proxy

@@ -33,6 +33,9 @@ namespace Proxy
                 // create a NATS subject from the request method and path
                 message.Subject = ExtractSubject(context.Request.Method, context.Request.Path.Value);
 
+                // emit a log message
+                Console.WriteLine($"Routing {string.Join(context.Request.Method, "", context.Request.Path.Value)} to {message.Subject}");
+
                 // parse the request headers, cookies, query params and body and put them on the message
                 ParseHttpRequest(context.Request, message);
 
