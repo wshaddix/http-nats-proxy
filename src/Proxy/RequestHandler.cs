@@ -223,10 +223,23 @@ namespace Proxy
                 // if the step pattern is "publish" then do a fire-and-forget NATS call, otherwise to a request/response
                 if (step.Pattern.Equals("publish", StringComparison.OrdinalIgnoreCase))
                 {
+                    // ensure the nats connection is still in a CONNECTED state
+                    if (_config.NatsConnection.State != ConnState.CONNECTED)
+                    {
+                        throw new Exception($"Cannot send message to the NATS server because the connection is in a {_config.NatsConnection.State} state");
+                    }
+
+                    // send the message to the nats server
                     _config.NatsConnection.Publish(subject, message.ToBytes(_config.JsonSerializerSettings));
                 }
                 else
                 {
+                    // ensure the nats connection is still in a CONNECTED state
+                    if (_config.NatsConnection.State != ConnState.CONNECTED)
+                    {
+                        throw new Exception($"Cannot send message to the NATS server because the connection is in a {_config.NatsConnection.State} state");
+                    }
+
                     // call the step and wait for the response
                     var response = await _config.NatsConnection.RequestAsync(subject, message.ToBytes(_config.JsonSerializerSettings), _config.Timeout);
 
