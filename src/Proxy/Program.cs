@@ -84,8 +84,35 @@ namespace Proxy
         {
             Console.WriteLine($"Attempting to connect to NATS server at: {_config.NatsUrl}");
 
+            // create a connection to the NATS server
             var connectionFactory = new ConnectionFactory();
-            _config.NatsConnection = connectionFactory.CreateConnection(_config.NatsUrl);
+            var options = ConnectionFactory.GetDefaultOptions();
+            options.AllowReconnect = true;
+            options.Url = _config.NatsUrl;
+            options.PingInterval = 1000;
+            options.MaxPingsOut = 2;
+            options.AsyncErrorEventHandler += (sender, args) =>
+            {
+                Console.WriteLine("The AsyncErrorEvent was just handled.");
+            };
+            options.ClosedEventHandler += (sender, args) =>
+            {
+                Console.WriteLine("The ClosedEvent was just handled.");
+            };
+            options.DisconnectedEventHandler += (sender, args) =>
+            {
+                Console.WriteLine("The DisconnectedEvent was just handled.");
+            };
+            options.ReconnectedEventHandler += (sender, args) =>
+            {
+                Console.WriteLine("The ReconnectedEvent was just handled.");
+            };
+            options.ServerDiscoveredEventHandler += (sender, args) =>
+            {
+                Console.WriteLine("The ServerDiscoveredEvent was just handled.");
+            };
+            options.Name = "http-nats-proxy";
+            _config.NatsConnection = connectionFactory.CreateConnection(options);
 
             Console.WriteLine("Connected to NATS server.");
         }
