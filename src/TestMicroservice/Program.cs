@@ -50,7 +50,7 @@ namespace TestMicroservice
             };
 
             // store the reply on the NATS message
-            msg["response"] = JsonConvert.SerializeObject(result);
+            msg["responseBody"] = JsonConvert.SerializeObject(result);
 
             // send the NATS message (with the response now set) back to the caller
             _connection.Publish(e.Message.Reply, PackageResponse(msg));
@@ -101,7 +101,7 @@ namespace TestMicroservice
             };
 
             // store the reply on the NATS message
-            msg["response"] = JsonConvert.SerializeObject(result);
+            msg["responseBody"] = JsonConvert.SerializeObject(result);
 
             // send the NATS message (with the response now set) back to the caller
             _connection.Publish(e.Message.Reply, PackageResponse(msg));
@@ -121,7 +121,7 @@ namespace TestMicroservice
             };
 
             // store the reply on the NATS message
-            msg["response"] = JsonConvert.SerializeObject(result);
+            msg["responseBody"] = JsonConvert.SerializeObject(result);
 
             // lets also override the response status code from the default 201
             msg["responseStatusCode"] = 200;

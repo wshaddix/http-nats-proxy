@@ -40,7 +40,7 @@ namespace LoggingMicroservice
         {
             // extract the message that we will log
             var log = Encoding.UTF8.GetString(e.Message.Data);
-            Console.WriteLine($"Received the log:\r\n{log}");
+            Console.WriteLine(log);
         }
     }
 }

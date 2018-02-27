@@ -26,3 +26,10 @@
 **1.0.3**
 
 * changing the format of the message that the proxy sends to microservices and the pipeline steps to make them more intuitive. Specifically changed `Cookies, ExtendedProperties, QueryParams, RequestHeaders` and `ResponseHeaders` from name/value collections to `Dictionary<string, object>` so they serialize into a more intuitive json string.
+
+**1.0.4** 
+
+* changed the call timings from a tuple to a custom class because tuples do not serialize to json with readable property names (see https://github.com/JamesNK/Newtonsoft.Json/issues/1230)
+* renamed property `Body` to `RequestBody` on the `NatsMessage`
+* renamed property `Response` to `ResponseBody` on the `NatsMessage`
+* introduced the concept of Observers to the request pipeline (see README for details)

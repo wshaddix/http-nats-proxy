@@ -21,6 +21,7 @@ namespace Proxy
         public Pipeline IncomingPipeline { get; private set; }
         public IConnection NatsConnection { get; set; }
         public string NatsUrl { get; set; }
+        public IList<string> Observers { get; set; }
         public Pipeline OutgoingPipeline { get; private set; }
         public int PatchStatusCode { get; set; }
         public string PipelineConfigFile { get; set; }
@@ -50,6 +51,9 @@ namespace Proxy
 
             // configure the outgoing pipeline
             ConfigureOutgoingPipeline(pipeline);
+
+            // configure the observers
+            ConfigureObservers(pipeline);
         }
 
         private Pipeline BuildRequestPipeline()
@@ -105,6 +109,16 @@ namespace Proxy
                     // add the step to the incoming pipeline
                     IncomingPipeline.Steps.Add(step);
                 }
+            }
+        }
+
+        private void ConfigureObservers(Pipeline pipeline)
+        {
+            Observers = new List<string>();
+
+            foreach (var observer in pipeline.Observers)
+            {
+                Observers.Add(observer.Subject);
             }
         }
 

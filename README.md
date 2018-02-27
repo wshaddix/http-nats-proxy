@@ -58,33 +58,30 @@ Every http(s) request that comes into the http-nats-proxy can go through a serie
 
 **order:** A numeric value that is the order that your step should be called in relation to other steps in the pipeline
 
+### Observers
+
+There are times when you want to get a copy of the request/response message after it has completed running through all of the pipeline steps. Examples of this would be when you wanted to log the request/response or capture metrics about how long each request took to process, etc. In these cases, the metadata about the request is not available during the execution of the pipeline steps. For these scenarios you can use Observers. Observers are notified via a NATS publish message after all of the pipeline steps have executed and metadata has been stored for the request/response pair. It is a "copy" of the final state of the http request.
+
 #### Example pipeline-config.yaml file
 ```
 steps:
-  - subject: pipeline.metrics
-    pattern: publish
-    direction: outgoing
-    order: 1
-
   - subject: trace.header
     pattern: request
     direction: incoming
-    order: 2
-
-  - subject: pipeline.logging
-    pattern: publish
-    direction: outgoing
-    order: 3
+    order: 1
 
   - subject: authentication
     pattern: request
     direction: incoming
-    order: 4
+    order: 2
 
   - subject: '*'
     pattern: request
     direction: incoming
-    order: 5
+    order: 3
+observers:
+  - subject: 'pipeline.logging'
+  - subject: 'pipeline.metrics'
 ```
 
 ## Configuration

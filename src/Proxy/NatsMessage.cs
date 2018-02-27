@@ -5,10 +5,22 @@ using System.Text;
 
 namespace Proxy
 {
+    public class CallTiming
+    {
+        public long EllapsedMs { get; set; }
+
+        public string Subject { get; set; }
+
+        public CallTiming(string subject, long ellapsedMs)
+        {
+            Subject = subject;
+            EllapsedMs = ellapsedMs;
+        }
+    }
+
     public sealed class NatsMessage
     {
-        public string Body { get; set; }
-        public List<(string, string, long)> CallTimings { get; set; }
+        public List<CallTiming> CallTimings { get; set; }
         public long CompletedOnUtc { get; set; }
         public Dictionary<string, object> Cookies { get; set; }
         public string ErrorMessage { get; set; }
@@ -16,8 +28,9 @@ namespace Proxy
         public Dictionary<string, object> ExtendedProperties { get; set; }
         public string Host { get; set; }
         public Dictionary<string, object> QueryParams { get; set; }
+        public string RequestBody { get; set; }
         public Dictionary<string, object> RequestHeaders { get; set; }
-        public string Response { get; set; }
+        public string ResponseBody { get; set; }
         public string ResponseContentType { get; set; }
         public Dictionary<string, object> ResponseHeaders { get; set; }
         public int ResponseStatusCode { get; set; }
@@ -45,7 +58,7 @@ namespace Proxy
             QueryParams = new Dictionary<string, object>();
             RequestHeaders = new Dictionary<string, object>();
             ResponseHeaders = new Dictionary<string, object>();
-            CallTimings = new List<(string, string, long)>();
+            CallTimings = new List<CallTiming>();
         }
 
         public void MarkComplete()

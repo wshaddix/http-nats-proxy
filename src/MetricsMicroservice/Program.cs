@@ -42,16 +42,15 @@ namespace MetricsMicroservice
         {
             // deserialize the NATS message
             var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
-            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            Console.WriteLine($"{DateTime.Now.ToShortTimeString()}: Message Called: {msg["subject"]} Total Execution Time (ms): {now - (long)msg["startedOnUtc"]}");
+            Console.WriteLine($"{DateTime.Now.ToShortTimeString()}: Message Called: {msg["subject"]} Total Execution Time (ms): {msg["executionTimeMs"]}");
             Console.WriteLine("\tBreakdown:");
 
             if (msg["callTimings"] is JArray callTimings)
             {
                 foreach (var token in callTimings)
                 {
-                    Console.WriteLine($"\t\tSubject: {token["item1"]} Pattern: {token["item2"]}, Execution Time (ms): {token["item3"]}");
+                    Console.WriteLine($"\t\tSubject: {token["subject"]} - Execution Time (ms): {token["ellapsedMs"]}");
                 }
             }
 

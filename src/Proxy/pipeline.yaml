@@ -1,25 +1,18 @@
 steps:
-  - subject: pipeline.metrics
-    pattern: publish
-    direction: outgoing
-    order: 1
-
   - subject: trace.header
     pattern: request
     direction: incoming
-    order: 2
-
-  - subject: pipeline.logging
-    pattern: publish
-    direction: outgoing
-    order: 3
+    order: 1
 
   - subject: authentication
     pattern: request
     direction: incoming
-    order: 4
+    order: 2
 
   - subject: '*'
     pattern: request
     direction: incoming
-    order: 5
+    order: 3
+observers:
+  - subject: 'pipeline.logging'
+  - subject: 'pipeline.metrics'

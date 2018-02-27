@@ -4,7 +4,6 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
 
@@ -29,7 +28,7 @@ namespace TraceHeaderPipelineStep
             var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
 
             // if the msg doesn't include a trace header we need to inject one
-            var traceHeader = msg["requestHeaders"][TraceHeaderName]?.FirstOrDefault();
+            var traceHeader = msg.SelectToken($"requestHeaders.{TraceHeaderName}");
 
             if (null == traceHeader)
             {

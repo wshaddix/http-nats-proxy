@@ -48,7 +48,7 @@ namespace Proxy
                     sw.Stop();
 
                     // record how long the step took to execute
-                    message.CallTimings.Add((step.Subject, step.Pattern, sw.ElapsedMilliseconds));
+                    message.CallTimings.Add(new CallTiming(step.Subject, sw.ElapsedMilliseconds));
 
                     // if the step requested termination we should stop processing steps
                     if (message.ShouldTerminateRequest)
@@ -65,11 +65,12 @@ namespace Proxy
                     sw.Stop();
 
                     // record how long the step took to execute
-                    message.CallTimings.Add((step.Subject, step.Pattern, sw.ElapsedMilliseconds));
+                    message.CallTimings.Add(new CallTiming(step.Subject, sw.ElapsedMilliseconds));
                 }
 
                 // set the response status code
-                context.Response.StatusCode = message.ResponseStatusCode == -1 ? DetermineStatusCode(context) : message.ResponseStatusCode;
+                message.ResponseStatusCode = message.ResponseStatusCode == -1 ? DetermineStatusCode(context) : message.ResponseStatusCode;
+                context.Response.StatusCode = message.ResponseStatusCode;
 
                 // set any response headers
                 foreach (var header in message.ResponseHeaders)
@@ -79,6 +80,12 @@ namespace Proxy
 
                 // capture the execution time that it took to process the message
                 message.MarkComplete();
+
+                // notify any observers that want a copy of the completed request/response
+                foreach (var observer in _config.Observers)
+                {
+                    NotifyObserver(message, observer);
+                }
 
                 // if the response message includes an error, then return it
                 if (!string.IsNullOrWhiteSpace(message.ErrorMessage))
@@ -92,9 +99,9 @@ namespace Proxy
                 }
 
                 // return the response to the api client
-                if (!string.IsNullOrWhiteSpace(message.Response))
+                if (!string.IsNullOrWhiteSpace(message.ResponseBody))
                 {
-                    await context.Response.WriteAsync(message.Response);
+                    await context.Response.WriteAsync(message.ResponseBody);
                 }
             }
             catch (Exception ex)
@@ -147,26 +154,30 @@ namespace Proxy
             return string.Concat(method, subjectPath).ToLower();
         }
 
-        private static NatsMessage MergeMessageProperties(NatsMessage message, NatsMessage responseMessage)
+        private static void MergeMessageProperties(NatsMessage message, NatsMessage responseMessage)
         {
             // we don't want to lose data on the original message if a microservice fails to return all of the data so we're going to just copy
             // non-null properties from the responseMessage onto the message
             message.ShouldTerminateRequest = responseMessage.ShouldTerminateRequest;
             message.ResponseStatusCode = responseMessage.ResponseStatusCode;
-            message.Response = responseMessage.Response;
+            message.ResponseBody = responseMessage.ResponseBody;
             message.ErrorMessage = responseMessage.ErrorMessage ?? message.ErrorMessage;
 
             // we want to concatenate the extended properties as each step in the pipeline may be adding information
-            message.ExtendedProperties = message.ExtendedProperties
-                                           .Concat(responseMessage.ExtendedProperties)
-                                           .ToDictionary(e => e.Key, e => e.Value);
+            message.ExtendedProperties.ToList().ForEach(h =>
+            {
+                if (!message.ExtendedProperties.ContainsKey(h.Key))
+                {
+                    message.ExtendedProperties.Add(h.Key, h.Value);
+                }
+            });
 
             // we want to add any request headers that the pipeline step could have added that are not already in the RequestHeaders dictionary
             responseMessage.RequestHeaders.ToList().ForEach(h =>
             {
                 if (!message.RequestHeaders.ContainsKey(h.Key))
                 {
-                    message.RequestHeaders[h.Key] = h.Value;
+                    message.RequestHeaders.Add(h.Key, h.Value);
                 }
             });
 
@@ -175,12 +186,9 @@ namespace Proxy
             {
                 if (!message.ResponseHeaders.ContainsKey(h.Key))
                 {
-                    message.ResponseHeaders[h.Key] = h.Value;
+                    message.ResponseHeaders.Add(h.Key, h.Value);
                 }
             });
-
-            // return the merged message
-            return message;
         }
 
         private static void ParseHttpRequest(HttpRequest request, NatsMessage message)
@@ -188,25 +196,25 @@ namespace Proxy
             // if there is a body with the request then read it
             using (var reader = new StreamReader(request.Body, Encoding.UTF8))
             {
-                message.Body = reader.ReadToEnd();
+                message.RequestBody = reader.ReadToEnd();
             }
 
             // parse the headers
             foreach (var header in request.Headers)
             {
-                message.RequestHeaders[header.Key] = header.Value;
+                message.RequestHeaders.Add(header.Key, string.Join(',', header.Value));
             }
 
             // parse the cookies
             foreach (var cookie in request.Cookies)
             {
-                message.Cookies[cookie.Key] = cookie.Value;
+                message.Cookies.Add(cookie.Key, string.Join(',', cookie.Value));
             }
 
             // parse the query string parameters
             foreach (var param in request.Query)
             {
-                message.QueryParams[param.Key] = param.Value;
+                message.QueryParams.Add(param.Key, string.Join(',', param.Value));
             }
         }
 
@@ -284,6 +292,18 @@ namespace Proxy
             {
                 throw new StepException(subject, step.Pattern, ex.GetBaseException().Message);
             }
+        }
+
+        private void NotifyObserver(NatsMessage message, string observer)
+        {
+            // ensure the nats connection is still in a CONNECTED state
+            if (_config.NatsConnection.State != ConnState.CONNECTED)
+            {
+                throw new Exception($"Cannot send message to the NATS server because the connection is in a {_config.NatsConnection.State} state");
+            }
+
+            // send the message to the nats server
+            _config.NatsConnection.Publish(observer, message.ToBytes(_config.JsonSerializerSettings));
         }
     }
 }
