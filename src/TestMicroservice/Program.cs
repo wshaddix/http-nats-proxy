@@ -1,7 +1,10 @@
 ﻿using NATS.Client;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 
 namespace TestMicroservice
@@ -11,24 +14,34 @@ namespace TestMicroservice
         // we use a mre to keep the console application running while it's waiting on messages from NATS in the background
         private static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
 
+        private static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        };
+
         private static IConnection _connection;
 
         private static void DeleteCustomer(object sender, MsgHandlerEventArgs e)
         {
+            Console.WriteLine($"Processing message from {e.Message.Subject}");
+
             // deserialize the NATS message
-            var msg = MessageHelper.GetNatsMessage(e.Message);
+            var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
 
             // let's simulate an error
-            msg.ErrorMessage = "You cannot delete this customer because there are unpaid invoices";
+            msg["errorMessage"] = "You cannot delete this customer because there are unpaid invoices";
+            msg["responseStatusCode"] = 400;
 
             // send the NATS message (with the error message now set) back to the caller
-            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
+            _connection.Publish(e.Message.Reply, PackageResponse(msg));
         }
 
         private static void GetCustomer(object sender, MsgHandlerEventArgs e)
         {
+            Console.WriteLine($"Processing message from {e.Message.Subject}");
+
             // deserialize the NATS message
-            var msg = MessageHelper.GetNatsMessage(e.Message);
+            var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
 
             // create a reply
             var result = new
@@ -37,10 +50,10 @@ namespace TestMicroservice
             };
 
             // store the reply on the NATS message
-            msg.Response = JsonConvert.SerializeObject(result);
+            msg["response"] = JsonConvert.SerializeObject(result);
 
             // send the NATS message (with the response now set) back to the caller
-            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
+            _connection.Publish(e.Message.Reply, PackageResponse(msg));
         }
 
         private static void Main(string[] args)
@@ -69,10 +82,17 @@ namespace TestMicroservice
             ManualResetEvent.WaitOne();
         }
 
+        private static byte[] PackageResponse(object data)
+        {
+            return Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data, SerializerSettings));
+        }
+
         private static void PostCustomer(object sender, MsgHandlerEventArgs e)
         {
+            Console.WriteLine($"Processing message from {e.Message.Subject}");
+
             // deserialize the NATS message
-            var msg = MessageHelper.GetNatsMessage(e.Message);
+            var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
 
             // create a reply
             var result = new
@@ -81,16 +101,18 @@ namespace TestMicroservice
             };
 
             // store the reply on the NATS message
-            msg.Response = JsonConvert.SerializeObject(result);
+            msg["response"] = JsonConvert.SerializeObject(result);
 
             // send the NATS message (with the response now set) back to the caller
-            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
+            _connection.Publish(e.Message.Reply, PackageResponse(msg));
         }
 
         private static void PutCustomer(object sender, MsgHandlerEventArgs e)
         {
+            Console.WriteLine($"Processing message from {e.Message.Subject}");
+
             // deserialize the NATS message
-            var msg = MessageHelper.GetNatsMessage(e.Message);
+            var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
 
             // create a reply
             var result = new
@@ -99,13 +121,13 @@ namespace TestMicroservice
             };
 
             // store the reply on the NATS message
-            msg.Response = JsonConvert.SerializeObject(result);
+            msg["response"] = JsonConvert.SerializeObject(result);
 
             // lets also override the response status code from the default 201
-            msg.ResponseStatusCode = 200;
+            msg["responseStatusCode"] = 200;
 
             // send the NATS message (with the response now set) back to the caller
-            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
+            _connection.Publish(e.Message.Reply, PackageResponse(msg));
         }
     }
 }

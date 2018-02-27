@@ -32,15 +32,14 @@ namespace LoggingMicroservice
             subscriptions.ForEach(s => s.Start());
 
             // keep this console app running
-            Console.WriteLine($"Connected to NATS at: {natsUrl}\r\nWaiting for messages...");
+            Console.WriteLine($"Logging Microservice connected to NATS at: {natsUrl}\r\nWaiting for messages...");
             ManualResetEvent.WaitOne();
         }
 
         private static void PostLog(object sender, MsgHandlerEventArgs e)
         {
-            // extract the metric from the nats message
+            // extract the message that we will log
             var log = Encoding.UTF8.GetString(e.Message.Data);
-
             Console.WriteLine($"Received the log:\r\n{log}");
         }
     }

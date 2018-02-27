@@ -114,7 +114,7 @@ namespace Proxy
             options.Name = "http-nats-proxy";
             _config.NatsConnection = connectionFactory.CreateConnection(options);
 
-            Console.WriteLine("Connected to NATS server.");
+            Console.WriteLine($"HttpNatsProxy connected to NATS at: {options.Url}\r\nWaiting for messages...");
         }
     }
 }

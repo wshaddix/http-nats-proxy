@@ -2,7 +2,6 @@
 using NATS.Client;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -73,10 +72,24 @@ namespace Proxy
                 context.Response.StatusCode = message.ResponseStatusCode == -1 ? DetermineStatusCode(context) : message.ResponseStatusCode;
 
                 // set any response headers
-                message.ResponseHeaders.ForEach(h => context.Response.GetTypedHeaders().Append(h.Key, h.Value));
+                foreach (var header in message.ResponseHeaders)
+                {
+                    context.Response.GetTypedHeaders().Append(header.Key, header.Value);
+                }
 
                 // capture the execution time that it took to process the message
                 message.MarkComplete();
+
+                // if the response message includes an error, then return it
+                if (!string.IsNullOrWhiteSpace(message.ErrorMessage))
+                {
+                    var response = new
+                    {
+                        message.ErrorMessage
+                    };
+
+                    await context.Response.WriteAsync(JsonConvert.SerializeObject(response, _config.JsonSerializerSettings));
+                }
 
                 // return the response to the api client
                 if (!string.IsNullOrWhiteSpace(message.Response))
@@ -148,15 +161,23 @@ namespace Proxy
                                            .Concat(responseMessage.ExtendedProperties)
                                            .ToDictionary(e => e.Key, e => e.Value);
 
-            // we want to add any request headers that the pipeline step could have added
-            message.RequestHeaders = message.RequestHeaders
-                                            .Concat(responseMessage.RequestHeaders)
-                                            .ToList();
+            // we want to add any request headers that the pipeline step could have added that are not already in the RequestHeaders dictionary
+            responseMessage.RequestHeaders.ToList().ForEach(h =>
+            {
+                if (!message.RequestHeaders.ContainsKey(h.Key))
+                {
+                    message.RequestHeaders[h.Key] = h.Value;
+                }
+            });
 
-            // we want to add any response headers that the pipeline step could have added
-            message.ResponseHeaders = message.ResponseHeaders
-                                            .Concat(responseMessage.ResponseHeaders)
-                                            .ToList();
+            // we want to add any response headers that the pipeline step could have added that are not already in the ResponseHeaders dictionary
+            responseMessage.ResponseHeaders.ToList().ForEach(h =>
+            {
+                if (!message.ResponseHeaders.ContainsKey(h.Key))
+                {
+                    message.ResponseHeaders[h.Key] = h.Value;
+                }
+            });
 
             // return the merged message
             return message;
@@ -171,13 +192,22 @@ namespace Proxy
             }
 
             // parse the headers
-            message.RequestHeaders = request.Headers.Select(h => new KeyValuePair<string, string>(h.Key, h.Value)).ToList();
+            foreach (var header in request.Headers)
+            {
+                message.RequestHeaders[header.Key] = header.Value;
+            }
 
             // parse the cookies
-            message.Cookies = request.Cookies.Select(c => new KeyValuePair<string, string>(c.Key, c.Value)).ToList();
+            foreach (var cookie in request.Cookies)
+            {
+                message.Cookies[cookie.Key] = cookie.Value;
+            }
 
             // parse the query string parameters
-            message.QueryParams = request.Query.Select(q => new KeyValuePair<string, string>(q.Key, q.Value)).ToList();
+            foreach (var param in request.Query)
+            {
+                message.QueryParams[param.Key] = param.Value;
+            }
         }
 
         private int DetermineStatusCode(HttpContext context)

@@ -1,6 +1,9 @@
 ﻿using NATS.Client;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 
 namespace MetricsMicroservice
@@ -38,16 +41,19 @@ namespace MetricsMicroservice
         private static void PostMetric(object sender, MsgHandlerEventArgs e)
         {
             // deserialize the NATS message
-            var msg = MessageHelper.GetNatsMessage(e.Message);
+            var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            Console.WriteLine($"{DateTime.Now.ToShortTimeString()}: Message Called: {msg.Subject} Total Execution Time (ms): {now - msg.StartedOnUtc}");
+            Console.WriteLine($"{DateTime.Now.ToShortTimeString()}: Message Called: {msg["subject"]} Total Execution Time (ms): {now - (long)msg["startedOnUtc"]}");
             Console.WriteLine("\tBreakdown:");
 
-            msg.CallTimings.ForEach(t =>
-                                    {
-                                        Console.WriteLine($"\t\tSubject: {t.Item1} Pattern: {t.Item2}, Execution Time (ms): {t.Item3}");
-                                    });
+            if (msg["callTimings"] is JArray callTimings)
+            {
+                foreach (var token in callTimings)
+                {
+                    Console.WriteLine($"\t\tSubject: {token["item1"]} Pattern: {token["item2"]}, Execution Time (ms): {token["item3"]}");
+                }
+            }
 
             Console.WriteLine(new string('-', 120));
         }

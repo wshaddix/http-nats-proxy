@@ -1,7 +1,10 @@
 ﻿using NATS.Client;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Text;
 using System.Threading;
 
 namespace AuthenticationPipelineStep
@@ -11,22 +14,27 @@ namespace AuthenticationPipelineStep
         // we use a mre to keep the console application running while it's waiting on messages from NATS in the background
         private static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
 
+        private static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        };
+
         private static IConnection _connection;
 
         private static void EnsureAuthHeaderPresent(object sender, MsgHandlerEventArgs e)
         {
             // deserialize the NATS message
-            var msg = MessageHelper.GetNatsMessage(e.Message);
+            var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
 
             // if the msg doesn't include an authentication header we need to return a redirect to the auth url
-            var authHeader = msg.RequestHeaders.FirstOrDefault(h => h.Key.Equals("Authorization"));
+            var authHeader = msg.SelectToken("requestHeaders.authorization");
 
-            if (null == authHeader.Value)
+            if (null == authHeader)
             {
                 Console.WriteLine($"No Authorization header found. Returning a 301 redirect to http://google.com");
-                msg.ResponseStatusCode = 301;
-                msg.ResponseHeaders.Add(new KeyValuePair<string, string>("Location", "https://google.com"));
-                msg.ShouldTerminateRequest = true;
+                msg["responseStatusCode"] = 301;
+                msg["responseHeaders"]["Location"] = "https://google.com";
+                msg["shouldTerminateRequest"] = true;
             }
             else
             {
@@ -34,7 +42,7 @@ namespace AuthenticationPipelineStep
             }
 
             // send the NATS message back to the caller
-            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
+            _connection.Publish(e.Message.Reply, PackageResponse(msg));
         }
 
         private static void Main(string[] args)
@@ -58,6 +66,11 @@ namespace AuthenticationPipelineStep
             // keep this console app running
             Console.WriteLine($"Authentication Pipeline Step Connected to NATS at: {natsUrl}\r\nWaiting for messages...");
             ManualResetEvent.WaitOne();
+        }
+
+        private static byte[] PackageResponse(object data)
+        {
+            return Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data, SerializerSettings));
         }
     }
 }

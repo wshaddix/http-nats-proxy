@@ -1,7 +1,11 @@
 ﻿using NATS.Client;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 
 namespace TraceHeaderPipelineStep
@@ -11,30 +15,35 @@ namespace TraceHeaderPipelineStep
         // we use a mre to keep the console application running while it's waiting on messages from NATS in the background
         private static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
 
+        private static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        };
+
         private static readonly string TraceHeaderName = Environment.GetEnvironmentVariable("TRACE_HEADER_NAME") ?? "x-trace-id";
         private static IConnection _connection;
 
         private static void InjectTraceHeader(object sender, MsgHandlerEventArgs e)
         {
             // deserialize the NATS message
-            var msg = MessageHelper.GetNatsMessage(e.Message);
+            var msg = JsonConvert.DeserializeObject<JObject>(Encoding.UTF8.GetString(e.Message.Data));
 
             // if the msg doesn't include a trace header we need to inject one
-            var traceHeader = msg.RequestHeaders.FirstOrDefault(h => h.Key.Equals(TraceHeaderName));
+            var traceHeader = msg["requestHeaders"][TraceHeaderName]?.FirstOrDefault();
 
-            if (null == traceHeader.Value)
+            if (null == traceHeader)
             {
                 var traceId = Guid.NewGuid().ToString("N");
-                msg.RequestHeaders.Add(new KeyValuePair<string, string>(TraceHeaderName, traceId));
+                msg["requestHeaders"][TraceHeaderName] = traceId;
                 Console.WriteLine($"Added trace header name: {TraceHeaderName} value: {traceId}");
             }
             else
             {
-                Console.WriteLine($"TraceId of {traceHeader.Value} was already on the message so nothing to do.");
+                Console.WriteLine($"TraceId of {traceHeader.Value<string>()} was already on the message so nothing to do.");
             }
 
             // send the NATS message (with the trace header now set) back to the caller
-            _connection.Publish(e.Message.Reply, MessageHelper.PackageResponse(msg));
+            _connection.Publish(e.Message.Reply, PackageResponse(msg));
         }
 
         private static void Main(string[] args)
@@ -58,6 +67,11 @@ namespace TraceHeaderPipelineStep
             // keep this console app running
             Console.WriteLine($"Trace Header Pipeline Step Connected to NATS at: {natsUrl}\r\nWaiting for messages...");
             ManualResetEvent.WaitOne();
+        }
+
+        private static byte[] PackageResponse(object data)
+        {
+            return Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data, SerializerSettings));
         }
     }
 }

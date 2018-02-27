@@ -15,3 +15,14 @@
 **1.0.1**
 
 * added logging to the request handler so that it's obvious when traffic is coming into the http-nats-proxy
+
+
+**1.0.2**
+
+* now checking the state of the NATS connection to ensure it's in a `CONNECTED` state before trying to send messages.
+* reduced the `PingInterval` of the NATS connection to help with reconnections when the NATS server becomes unavailable
+* now logging when NATS connection events happen
+
+**1.0.3**
+
+* changing the format of the message that the proxy sends to microservices and the pipeline steps to make them more intuitive. Specifically changed `Cookies, ExtendedProperties, QueryParams, RequestHeaders` and `ResponseHeaders` from name/value collections to `Dictionary<string, object>` so they serialize into a more intuitive json string.

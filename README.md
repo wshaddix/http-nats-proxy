@@ -17,26 +17,34 @@ When an http request is received, the http-nats-proxy will extract the headers, 
 
 ```
 {
-	"headers": [
-		{"key": '', "value": ''}.
-		{"key": '', "value": ''}
-	],
-	"cookies": [
-		{"key": '', "value": ''}.
-		{"key": '', "value": ''}
-	],
-	"queryParams": [
-		{"key": '', "value": ''}.
-		{"key": '', "value": ''}
-	],
-	"body": '',
-	"responseStatusCode": -1,
-	"response": '',
-	"errorMessage", ''
+	"requestHeaders": {
+	    "key1": "value1",
+	    "key2": "value2"
+	},
+	"cookies": {
+	    "key1": "value1",
+	    "key2": "value2"
+	},
+	"queryParams": {
+	    "key1": "value1",
+	    "key2": "value2"
+	},
+	"extendedProperties": {                 <--- can be set by microservices and pipeline steps
+	    "key1": "value1",
+	    "key2": "value2"
+	},
+	"responseHeaders": {                    <--- can be set by microservices and pipeline steps
+	    "key1": "value1",
+	    "key2": "value2"
+	},
+	"body": "",
+	"response": "",                         <--- can be set by microservices and pipeline steps
+	"responseStatusCode": -1,               <--- can be set by microservices and pipeline steps
+	"shouldTerminateRequest": true|false,   <--- can be set by microservices and pipeline steps
+	"response": "",                         <--- can be set by microservices and pipeline steps
+	"errorMessage", ""                      <--- can be set by microservices and pipeline steps
 }
 ```
-
-Each of the http request headers, cookies and query parameters will be represented as a key/value pair. The body will be represented as a string.
 
 ### Pipelines
 
@@ -106,7 +114,9 @@ cd src
 docker-compose up
 ```
 
-This will run the http-nats-proxy in a container alongside a NATS server and a test microservice. The http-nats-proxy will listen for http requests on port 5000 of your host machine. You can then send http requests to the proxy and have them processed by the test microservice. The test microservice that comes with this repo will respond to the following http routes:
+This will run the NATS server in a container.
+
+Next start the project from Visual Studio and make sure that each project in the solution is set to run on startup (multi-project start-up configuration). The http-nats-proxy will listen for http requests on port 5000 of your host machine. You can then send http requests to the proxy and have them processed by the test microservice. The test microservice that comes with this repo will respond to the following http routes:
 
 ```
 GET http://localhost:5000/test/v1/customer
@@ -125,17 +135,6 @@ cd src
 docker build -t http-nats-proxy .
 
 ```
-
-## Debugging your microservices
-It can be useful to have NATS and the http-nats-proxy running while you are coding and debugging your microservices. In order to assist with this scenario there is a docker compose file that will run NATS and the http-nats-proxy where you can test out your microservice easily. The steps to do this are:
-
-1. From the `src` directory run
-```
-docker-compose -f docker-compose-nats-only.yml up
-```
-
-2. Code your microservice and have it connect to nats at `nats://localhost:4222`
-3. Once your microservice is ready to test, send in http requests through CURL, Postman or whatever means you want to the http-nats-proxy at `http://localhost:5000`
 
 ## Responsibilities of your microservices
 

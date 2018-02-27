@@ -10,16 +10,16 @@ namespace Proxy
         public string Body { get; set; }
         public List<(string, string, long)> CallTimings { get; set; }
         public long CompletedOnUtc { get; set; }
-        public List<KeyValuePair<string, string>> Cookies { get; set; }
+        public Dictionary<string, object> Cookies { get; set; }
         public string ErrorMessage { get; set; }
         public long ExecutionTimeMs => CompletedOnUtc - StartedOnUtc;
-        public Dictionary<string, string> ExtendedProperties { get; set; }
+        public Dictionary<string, object> ExtendedProperties { get; set; }
         public string Host { get; set; }
-        public List<KeyValuePair<string, string>> QueryParams { get; set; }
-        public List<KeyValuePair<string, string>> RequestHeaders { get; set; }
+        public Dictionary<string, object> QueryParams { get; set; }
+        public Dictionary<string, object> RequestHeaders { get; set; }
         public string Response { get; set; }
         public string ResponseContentType { get; set; }
-        public List<KeyValuePair<string, string>> ResponseHeaders { get; set; }
+        public Dictionary<string, object> ResponseHeaders { get; set; }
         public int ResponseStatusCode { get; set; }
         public bool ShouldTerminateRequest { get; set; }
         public long StartedOnUtc { get; set; }
@@ -40,11 +40,11 @@ namespace Proxy
             ResponseContentType = contentType;
 
             // initialize the default properties
-            Cookies = new List<KeyValuePair<string, string>>();
-            ExtendedProperties = new Dictionary<string, string>();
-            QueryParams = new List<KeyValuePair<string, string>>();
-            RequestHeaders = new List<KeyValuePair<string, string>>();
-            ResponseHeaders = new List<KeyValuePair<string, string>>();
+            Cookies = new Dictionary<string, object>();
+            ExtendedProperties = new Dictionary<string, object>();
+            QueryParams = new Dictionary<string, object>();
+            RequestHeaders = new Dictionary<string, object>();
+            ResponseHeaders = new Dictionary<string, object>();
             CallTimings = new List<(string, string, long)>();
         }
 
