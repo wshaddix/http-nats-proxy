@@ -17,32 +17,31 @@ When an http request is received, the http-nats-proxy will extract the headers, 
 
 ```
 {
-	"requestHeaders": {
-	    "key1": "value1",
-	    "key2": "value2"
-	},
-	"cookies": {
-	    "key1": "value1",
-	    "key2": "value2"
-	},
-	"queryParams": {
-	    "key1": "value1",
-	    "key2": "value2"
-	},
-	"extendedProperties": {                 <--- can be set by microservices and pipeline steps
-	    "key1": "value1",
-	    "key2": "value2"
-	},
-	"responseHeaders": {                    <--- can be set by microservices and pipeline steps
-	    "key1": "value1",
-	    "key2": "value2"
-	},
-	"body": "",
-	"response": "",                         <--- can be set by microservices and pipeline steps
-	"responseStatusCode": -1,               <--- can be set by microservices and pipeline steps
-	"shouldTerminateRequest": true|false,   <--- can be set by microservices and pipeline steps
-	"response": "",                         <--- can be set by microservices and pipeline steps
-	"errorMessage", ""                      <--- can be set by microservices and pipeline steps
+    "cookies": {
+        "key1": "value1",
+        "key2": "value2"
+    },
+    "errorMessage", "",                     <--- can be set by microservices and pipeline steps
+    "extendedProperties": {                 <--- can be set by microservices and pipeline steps
+        "key1": "value1",
+        "key2": "value2"
+    },
+    "queryParams": {
+        "key1": "value1",
+        "key2": "value2"
+    },
+    "requestBody": "",
+    "requestHeaders": {
+        "key1": "value1",
+        "key2": "value2"
+    },
+    "responseBody": "",                     <--- can be set by microservices and pipeline steps
+    "responseHeaders": {                    <--- can be set by microservices and pipeline steps
+        "key1": "value1",
+        "key2": "value2"
+    },
+    "responseStatusCode": -1,               <--- can be set by microservices and pipeline steps
+    "shouldTerminateRequest": true|false    <--- can be set by microservices and pipeline steps
 }
 ```
 
