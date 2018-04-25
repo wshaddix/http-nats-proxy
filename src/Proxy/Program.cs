@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using NATS.Client;
 using System;
 using System.Net;
@@ -72,8 +73,16 @@ namespace Proxy
                     // tell Kestrel to listen on all ip addresses at the specififed port
                     options.Listen(IPAddress.Any, int.Parse(_config.Port));
                 })
+                .ConfigureServices(services =>
+                {
+                    // enable cors
+                    services.AddCors();
+                })
                 .Configure(app =>
                 {
+                    // configure cors to allow any origin
+                    app.UseCors(builder => builder.AllowAnyOrigin());
+
                     // every http request will be handled by our request handler
                     app.Run(requestHandler.HandleAsync);
                 })
