@@ -25,7 +25,7 @@ namespace LoggingMicroservice
             // setup a subscription to the "test" queues using a queue group for this microservice
             var subscriptions = new List<IAsyncSubscription>
             {
-                _connection.SubscribeAsync("pipeline.logging", "logging-microservice-group", PostLog),
+                _connection.SubscribeAsync("post.pipeline.logging", "logging-microservice-group", PostLog),
             };
 
             // start the subscriptions

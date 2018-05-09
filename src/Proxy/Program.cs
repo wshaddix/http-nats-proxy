@@ -76,12 +76,22 @@ namespace Proxy
                 .ConfigureServices(services =>
                 {
                     // enable cors
-                    services.AddCors();
+                    services.AddCors(options =>
+                    {
+                        options.AddPolicy("DefaultCORS", builder =>
+                        {
+                            builder
+                                .AllowAnyHeader()
+                                .AllowAnyMethod()
+                                .AllowAnyOrigin()
+                                .AllowCredentials();
+                        });
+                    });
                 })
                 .Configure(app =>
                 {
                     // configure cors to allow any origin
-                    app.UseCors(builder => builder.AllowAnyOrigin());
+                    app.UseCors("DefaultCORS");
 
                     // every http request will be handled by our request handler
                     app.Run(requestHandler.HandleAsync);

@@ -71,7 +71,7 @@ namespace TestMicroservice
                 _connection.SubscribeAsync("get.test.v1.customer", "test-microservice-group", GetCustomer),
                 _connection.SubscribeAsync("post.test.v1.customer", "test-microservice-group", PostCustomer),
                 _connection.SubscribeAsync("put.test.v1.customer", "test-microservice-group", PutCustomer),
-                 _connection.SubscribeAsync("delete.test.v1.customer", "test-microservice-group", DeleteCustomer)
+                _connection.SubscribeAsync("delete.test.v1.customer", "test-microservice-group", DeleteCustomer)
             };
 
             // start the subscriptions
