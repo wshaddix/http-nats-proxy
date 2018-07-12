@@ -10,3 +10,5 @@
 LICENSE
 README.md
 **/*.user
+docker-compose.yml
+**/Properties/

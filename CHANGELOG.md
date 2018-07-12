@@ -40,3 +40,15 @@
 ## 1.0.6
 
 * bugfix - when CORS was enabled in release 1.0.5 I didn't fully enable it b/c i didn't include the .AllowCredentials() method on the CORS policy builder
+
+## 1.1.0
+
+* extracted some types and helper classes into Proxy.Shared and made into a nuget package for other c# based microservices to leverage
+* refactored the example handlers (handlers and observers) to use the Proxy.Shared library
+* updated the docker image to use dotnet core 2.1 alpine
+* updated logging to use serilog instead of console.writeline
+* updated referenced nuget packages to their latest versions
+* refactored the request handler to be less bloated and more focused
+* updated nats to version 1.2.0
+* now compiling against .net core 2.1.300
+* added a .TryGetParam() method to the MicroserviceMessage to make it easier to get at headers, cookies and query string params

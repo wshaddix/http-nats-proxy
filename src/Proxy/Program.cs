@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using NATS.Client;
+using Serilog;
 using System;
 using System.Net;
 
@@ -14,6 +15,9 @@ namespace Proxy
 
         public static void Main(string[] args)
         {
+            // configure our logger
+            ConfigureLogging();
+
             // capture the runtime configuration settings
             ConfigureEnvironment();
 
@@ -29,7 +33,7 @@ namespace Proxy
 
         private static void ConfigureEnvironment()
         {
-            Console.WriteLine("Reading configuration values...");
+            Log.Information("Reading configuration values");
 
             _config = new ProxyConfiguration
             {
@@ -59,7 +63,15 @@ namespace Proxy
 
             _config.Build();
 
-            Console.WriteLine("Configured.");
+            Log.Information("Configured");
+        }
+
+        private static void ConfigureLogging()
+        {
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.Console()
+                .CreateLogger();
         }
 
         private static void ConfigureWebHost()
@@ -101,7 +113,7 @@ namespace Proxy
 
         private static void ConnectToNats()
         {
-            Console.WriteLine($"Attempting to connect to NATS server at: {_config.NatsUrl}");
+            Log.Information("Attempting to connect to NATS server at: {NatsUrl}", _config.NatsUrl);
 
             // create a connection to the NATS server
             var connectionFactory = new ConnectionFactory();
@@ -112,28 +124,29 @@ namespace Proxy
             options.MaxPingsOut = 2;
             options.AsyncErrorEventHandler += (sender, args) =>
             {
-                Console.WriteLine("The AsyncErrorEvent was just handled.");
+                Log.Information("The AsyncErrorEvent was just handled.");
             };
             options.ClosedEventHandler += (sender, args) =>
             {
-                Console.WriteLine("The ClosedEvent was just handled.");
+                Log.Information("The ClosedEvent was just handled.");
             };
             options.DisconnectedEventHandler += (sender, args) =>
             {
-                Console.WriteLine("The DisconnectedEvent was just handled.");
+                Log.Information("The DisconnectedEvent was just handled.");
             };
             options.ReconnectedEventHandler += (sender, args) =>
             {
-                Console.WriteLine("The ReconnectedEvent was just handled.");
+                Log.Information("The ReconnectedEvent was just handled.");
             };
             options.ServerDiscoveredEventHandler += (sender, args) =>
             {
-                Console.WriteLine("The ServerDiscoveredEvent was just handled.");
+                Log.Information("The ServerDiscoveredEvent was just handled.");
             };
             options.Name = "http-nats-proxy";
             _config.NatsConnection = connectionFactory.CreateConnection(options);
 
-            Console.WriteLine($"HttpNatsProxy connected to NATS at: {options.Url}\r\nWaiting for messages...");
+            Log.Information("HttpNatsProxy connected to NATS at {Url}", options.Url);
+            Log.Information("Waiting for messages");
         }
     }
 }

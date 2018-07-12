@@ -1,11 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
-using NATS.Client;
 using Newtonsoft.Json;
+using Proxy.Shared;
 using System;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Proxy
@@ -13,96 +9,36 @@ namespace Proxy
     public class RequestHandler
     {
         private readonly ProxyConfiguration _config;
+        private readonly PipelineExecutor _pipelineExecutor;
 
         public RequestHandler(ProxyConfiguration config)
         {
             _config = config;
+            _pipelineExecutor = new PipelineExecutor(natsConnection: _config.NatsConnection,
+                                                     jsonSerializerSettings: _config.JsonSerializerSettings,
+                                                     timeout: _config.Timeout,
+                                                     incomingPipeline: _config.IncomingPipeline,
+                                                     outgoingPipeline: _config.OutgoingPipeline,
+                                                     observers: _config.Observers);
         }
 
         public async Task HandleAsync(HttpContext context)
         {
-            // create a new message
-            var message = new NatsMessage(_config.Host, _config.ContentType);
+            var message = NatsMessageFactory.InitializeMessage(_config);
 
             try
             {
-                // set the content type of the http response
-                context.Response.ContentType = _config.ContentType;
+                // create a nats message from the http request
+                CreateNatsMsgFromHttpRequest(context.Request, message);
 
-                // create a NATS subject from the request method and path
-                message.Subject = ExtractSubject(context.Request.Method, context.Request.Path.Value);
+                // execute the request pipeline
+                await _pipelineExecutor.ExecutePipelineAsync(message).ConfigureAwait(false);
 
-                // emit a log message
-                Console.WriteLine($"Routing {string.Join(context.Request.Method, "", context.Request.Path.Value)} to {message.Subject}");
-
-                // parse the request headers, cookies, query params and body and put them on the message
-                ParseHttpRequest(context.Request, message);
-
-                // execute the incoming request pipeline in order
-                var sw = Stopwatch.StartNew();
-                foreach (var step in _config.IncomingPipeline.Steps)
-                {
-                    // execute the step
-                    sw.Restart();
-                    await ExecuteStep(message, step);
-                    sw.Stop();
-
-                    // record how long the step took to execute
-                    message.CallTimings.Add(new CallTiming(step.Subject, sw.ElapsedMilliseconds));
-
-                    // if the step requested termination we should stop processing steps
-                    if (message.ShouldTerminateRequest)
-                    {
-                        break;
-                    }
-                }
-
-                // execute the outgoing request pipeline in descending order
-                foreach (var step in _config.OutgoingPipeline.Steps)
-                {
-                    sw.Restart();
-                    await ExecuteStep(message, step);
-                    sw.Stop();
-
-                    // record how long the step took to execute
-                    message.CallTimings.Add(new CallTiming(step.Subject, sw.ElapsedMilliseconds));
-                }
-
-                // set the response status code
-                message.ResponseStatusCode = message.ResponseStatusCode == -1 ? DetermineStatusCode(context) : message.ResponseStatusCode;
-                context.Response.StatusCode = message.ResponseStatusCode;
-
-                // set any response headers
-                foreach (var header in message.ResponseHeaders)
-                {
-                    context.Response.GetTypedHeaders().Append(header.Key, header.Value);
-                }
-
-                // capture the execution time that it took to process the message
-                message.MarkComplete();
+                // create the http response from the processed nats message
+                CreateHttpResponseFromNatsMsg(context, message);
 
                 // notify any observers that want a copy of the completed request/response
-                foreach (var observer in _config.Observers)
-                {
-                    NotifyObserver(message, observer);
-                }
-
-                // if the response message includes an error, then return it
-                if (!string.IsNullOrWhiteSpace(message.ErrorMessage))
-                {
-                    var response = new
-                    {
-                        message.ErrorMessage
-                    };
-
-                    await context.Response.WriteAsync(JsonConvert.SerializeObject(response, _config.JsonSerializerSettings));
-                }
-
-                // return the response to the api client
-                if (!string.IsNullOrWhiteSpace(message.ResponseBody))
-                {
-                    await context.Response.WriteAsync(message.ResponseBody);
-                }
+                _pipelineExecutor.NotifyObservers(message);
             }
             catch (Exception ex)
             {
@@ -134,88 +70,42 @@ namespace Proxy
                 message.MarkComplete();
 
                 // write the response as a json formatted response
-                await context.Response.WriteAsync(JsonConvert.SerializeObject(response, _config.JsonSerializerSettings));
+                await context.Response.WriteAsync(JsonConvert.SerializeObject(response, _config.JsonSerializerSettings)).ConfigureAwait(false);
             }
         }
 
-        private static NatsMessage ExtractMessageFromReply(Msg reply)
+        private static void CreateNatsMsgFromHttpRequest(HttpRequest httpRequest, MicroserviceMessage message)
         {
-            // the NATS msg.Data property is a json encoded instance of our NatsMessage so we convert it from a byte[] to a string and then deserialize
-            // it from json
-            return JsonConvert.DeserializeObject<NatsMessage>(Encoding.UTF8.GetString(reply.Data));
+            // create a NATS subject from the request method and path
+            message.Subject = NatsSubjectParser.Parse(httpRequest.Method, httpRequest.Path.Value);
+
+            // parse the request headers, cookies, query params and body and put them on the message
+            ParseHttpRequest(httpRequest, message);
         }
 
-        private static string ExtractSubject(string method, string path)
+        private static void ParseHttpRequest(HttpRequest request, MicroserviceMessage message)
         {
-            // replace all forward slashes with periods in the http request path
-            var subjectPath = path.Replace('/', '.');
+            // parse the http request body
+            message.RequestBody = HttpRequestParser.ParseBody(request.Body);
 
-            // the subject is the http method followed by the path all lowercased
-            return string.Concat(method, subjectPath).ToLower();
-        }
-
-        private static void MergeMessageProperties(NatsMessage message, NatsMessage responseMessage)
-        {
-            // we don't want to lose data on the original message if a microservice fails to return all of the data so we're going to just copy
-            // non-null properties from the responseMessage onto the message
-            message.ShouldTerminateRequest = responseMessage.ShouldTerminateRequest;
-            message.ResponseStatusCode = responseMessage.ResponseStatusCode;
-            message.ResponseBody = responseMessage.ResponseBody;
-            message.ErrorMessage = responseMessage.ErrorMessage ?? message.ErrorMessage;
-
-            // we want to concatenate the extended properties as each step in the pipeline may be adding information
-            message.ExtendedProperties.ToList().ForEach(h =>
-            {
-                if (!message.ExtendedProperties.ContainsKey(h.Key))
-                {
-                    message.ExtendedProperties.Add(h.Key, h.Value);
-                }
-            });
-
-            // we want to add any request headers that the pipeline step could have added that are not already in the RequestHeaders dictionary
-            responseMessage.RequestHeaders.ToList().ForEach(h =>
-            {
-                if (!message.RequestHeaders.ContainsKey(h.Key))
-                {
-                    message.RequestHeaders.Add(h.Key, h.Value);
-                }
-            });
-
-            // we want to add any response headers that the pipeline step could have added that are not already in the ResponseHeaders dictionary
-            responseMessage.ResponseHeaders.ToList().ForEach(h =>
-            {
-                if (!message.ResponseHeaders.ContainsKey(h.Key))
-                {
-                    message.ResponseHeaders.Add(h.Key, h.Value);
-                }
-            });
-        }
-
-        private static void ParseHttpRequest(HttpRequest request, NatsMessage message)
-        {
-            // if there is a body with the request then read it
-            using (var reader = new StreamReader(request.Body, Encoding.UTF8))
-            {
-                message.RequestBody = reader.ReadToEnd();
-            }
-
-            // parse the headers
-            foreach (var header in request.Headers)
-            {
-                message.RequestHeaders.Add(header.Key, string.Join(',', header.Value));
-            }
+            // parse the request headers
+            message.RequestHeaders = HttpRequestParser.ParseHeaders(request.Headers);
 
             // parse the cookies
-            foreach (var cookie in request.Cookies)
-            {
-                message.Cookies.Add(cookie.Key, string.Join(',', cookie.Value));
-            }
+            message.Cookies = HttpRequestParser.ParseCookies(request.Cookies);
 
             // parse the query string parameters
-            foreach (var param in request.Query)
-            {
-                message.QueryParams.Add(param.Key, string.Join(',', param.Value));
-            }
+            message.QueryParams = HttpRequestParser.ParseQueryParams(request.Query);
+        }
+
+        private void CreateHttpResponseFromNatsMsg(HttpContext context, MicroserviceMessage message)
+        {
+            // set the response status code
+            message.ResponseStatusCode =
+                message.ResponseStatusCode == -1 ? DetermineStatusCode(context) : message.ResponseStatusCode;
+
+            // build up the http response
+            HttpResponseFactory.PrepareResponseAsync(context.Response, message, _config.JsonSerializerSettings);
         }
 
         private int DetermineStatusCode(HttpContext context)
@@ -249,61 +139,6 @@ namespace Proxy
             }
 
             return statusCode;
-        }
-
-        private async Task ExecuteStep(NatsMessage message, Step step)
-        {
-            // the subject is the step's configured subject unless it is an '*' in which case it's the microservice itself
-            var subject = step.Subject.Equals("*") ? message.Subject : step.Subject;
-
-            try
-            {
-                // if the step pattern is "publish" then do a fire-and-forget NATS call, otherwise to a request/response
-                if (step.Pattern.Equals("publish", StringComparison.OrdinalIgnoreCase))
-                {
-                    // ensure the nats connection is still in a CONNECTED state
-                    if (_config.NatsConnection.State != ConnState.CONNECTED)
-                    {
-                        throw new Exception($"Cannot send message to the NATS server because the connection is in a {_config.NatsConnection.State} state");
-                    }
-
-                    // send the message to the nats server
-                    _config.NatsConnection.Publish(subject, message.ToBytes(_config.JsonSerializerSettings));
-                }
-                else
-                {
-                    // ensure the nats connection is still in a CONNECTED state
-                    if (_config.NatsConnection.State != ConnState.CONNECTED)
-                    {
-                        throw new Exception($"Cannot send message to the NATS server because the connection is in a {_config.NatsConnection.State} state");
-                    }
-
-                    // call the step and wait for the response
-                    var response = await _config.NatsConnection.RequestAsync(subject, message.ToBytes(_config.JsonSerializerSettings), _config.Timeout);
-
-                    // extract the response message
-                    var responseMessage = ExtractMessageFromReply(response);
-
-                    // merge the response into our original nats message
-                    MergeMessageProperties(message, responseMessage);
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new StepException(subject, step.Pattern, ex.GetBaseException().Message);
-            }
-        }
-
-        private void NotifyObserver(NatsMessage message, string observer)
-        {
-            // ensure the nats connection is still in a CONNECTED state
-            if (_config.NatsConnection.State != ConnState.CONNECTED)
-            {
-                throw new Exception($"Cannot send message to the NATS server because the connection is in a {_config.NatsConnection.State} state");
-            }
-
-            // send the message to the nats server
-            _config.NatsConnection.Publish(observer, message.ToBytes(_config.JsonSerializerSettings));
         }
     }
 }

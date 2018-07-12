@@ -1,18 +1,13 @@
 steps:
-  - subject: trace.header
+  - subject: add.tracing
     pattern: request
     direction: incoming
     order: 1
 
-  - subject: authentication
-    pattern: request
-    direction: incoming
-    order: 2
-
   - subject: '*'
     pattern: request
     direction: incoming
-    order: 3
+    order: 2
 observers:
-  - subject: 'pipeline.logging'
-  - subject: 'pipeline.metrics'
+  - subject: 'logging'
+  - subject: 'record.metrics'
