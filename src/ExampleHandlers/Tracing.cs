@@ -21,6 +21,7 @@ namespace ExampleHandlers
                 // add a trace header to the msg
                 var traceId = Guid.NewGuid().ToString("N");
                 msg.RequestHeaders.Add(headerName, traceId);
+                msg.ResponseHeaders.Add(headerName, traceId);
 
                 Log.Information("Added trace id of {TraceId} to the message", traceId);
             }

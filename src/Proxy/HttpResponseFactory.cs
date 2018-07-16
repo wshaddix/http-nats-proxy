@@ -12,6 +12,9 @@ namespace Proxy
             // set the status code
             httpResponse.StatusCode = message.ResponseStatusCode;
 
+            // set the response type
+            httpResponse.ContentType = message.ResponseContentType;
+
             // set any response headers
             foreach (var header in message.ResponseHeaders)
             {
