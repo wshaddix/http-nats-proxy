@@ -6,8 +6,9 @@
     <Authors>Wes Shaddix</Authors>
     <Product />
     <Description>A shared library with types and helper classes for interacting with the http-nats-proxy</Description>
-    <PackageReleaseNotes>Initial version</PackageReleaseNotes>
+    <PackageReleaseNotes></PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/wshaddix/http-nats-proxy</PackageProjectUrl>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
