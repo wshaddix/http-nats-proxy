@@ -7,7 +7,7 @@ namespace Proxy
         internal static string Parse(string httpMethod, string urlPath)
         {
             // replace all forward slashes with periods in the http request path
-            var subjectPath = urlPath.Replace('/', '.');
+            var subjectPath = urlPath.Replace('/', '.').Trim('.');
 
             // the subject is the http method followed by the path all lowercased
             var subject = string.Concat(httpMethod, subjectPath).ToLower();
