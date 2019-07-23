@@ -115,10 +115,8 @@ This will run the NATS server in a container.
 Next start the project from Visual Studio and make sure that each project in the solution is set to run on startup (multi-project start-up configuration). The http-nats-proxy will listen for http requests on port 5000 of your host machine. You can then send http requests to the proxy and have them processed by the test microservice. The test microservice that comes with this repo will respond to the following http routes:
 
 ```
-GET http://localhost:5000/test/v1/customer
-PUT http://localhost:5000/test/v1/customer  <-- will override the response status code to be 200 (example of response status code overriding)
-POST http://localhost:5000/test/v1/customer
-DELETE http://localhost:5000/test/v1/customer <-- will return an error stating that the customer cannot be deleted (example of returning an error from your microservice)
+GET http://localhost:5000/healthcheck
+GET http://localhost:5000/customers?id=<any integer>
 ```
 
 Additionally, if configured for metrics, logging and tracing you will see the output of those microservices as well in your terminal. This is for demo purposes only. There is a 1/2 second delay in the logging and metrics microservices just to simulate work.
