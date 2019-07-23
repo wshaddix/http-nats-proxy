@@ -73,7 +73,7 @@ namespace Proxy
             message.ErrorMessage = responseMessage.ErrorMessage ?? message.ErrorMessage;
 
             // we want to concatenate the extended properties as each step in the pipeline may be adding information
-            message.ExtendedProperties.ToList().ForEach(h =>
+            responseMessage.ExtendedProperties.ToList().ForEach(h =>
             {
                 if (!message.ExtendedProperties.ContainsKey(h.Key))
                 {
