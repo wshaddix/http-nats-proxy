@@ -52,3 +52,17 @@
 * updated nats to version 1.2.0
 * now compiling against .net core 2.1.300
 * added a .TryGetParam() method to the MicroserviceMessage to make it easier to get at headers, cookies and query string params
+
+## 1.1.1
+
+* fixing issue where response type was not getting set 
+
+## 1.1.2
+
+* code cleanup
+* updated .net core version to 2.2.301
+* updated docker images to mcr.microsoft.com/dotnet/core/sdk:2.2.301-alpine3.9 and mcr.microsoft.com/dotnet/core/runtime:2.2.6-alpine3.9
+* updated NATS server version to 1.4.1
+* updated projects target framework to .Net Core 2.2
+* merged in PR to fix parsing of extended properties during pipeline execution (thanks to https://github.com/timsmid)
+* updated all nuget dependencies
