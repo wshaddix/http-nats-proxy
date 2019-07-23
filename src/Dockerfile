@@ -1,7 +1,7 @@
 ﻿# STAGE 1 - COMPILE AND PUBLISH
 
 # use the image that has the build tools for the "build stage"
-FROM microsoft/dotnet:2.1-sdk-alpine AS build-env
+FROM mcr.microsoft.com/dotnet/core/sdk:2.2.301-alpine3.9 AS build-env
 
 # set the working directory in the image as "app"
 WORKDIR /app
@@ -22,7 +22,7 @@ RUN dotnet publish ./Proxy/Proxy.csproj -c Release -o /publish
 # STAGE 2 - BUILD RUNTIME OPTIMIZED IMAGE
 
 # use the runtime optimized image that does not have any build tools, only the .net core runtime
-FROM microsoft/dotnet:2.1-runtime-alpine
+FROM mcr.microsoft.com/dotnet/core/runtime:2.2.6-alpine3.9
 
 # set the working directory in the image as "app"
 WORKDIR /app
