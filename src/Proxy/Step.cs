@@ -2,9 +2,9 @@
 {
     public class Step
     {
-        public string Direction { get; set; }
+        public required string Direction { get; set; }
         public int Order { get; set; }
-        public string Pattern { get; set; }
-        public string Subject { get; set; }
+        public required string Pattern { get; set; }
+        public required string Subject { get; set; }
     }
 }

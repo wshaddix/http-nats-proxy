@@ -1,14 +1,17 @@
 ﻿using Proxy.Shared;
 using Serilog;
-using System;
-using System.Threading.Tasks;
 
 namespace ExampleHandlers
 {
     public class Tracing : IMessageHandler
     {
-        public Task<MicroserviceMessage> HandleAsync(MicroserviceMessage msg)
+        public Task<MicroserviceMessage> HandleAsync(MicroserviceMessage? msg)
         {
+            if (msg is null)
+            {
+                throw new Exception("msg is null");
+            }
+
             const string headerName = "x-trace-id";
 
             // see if a trace header is already on the msg

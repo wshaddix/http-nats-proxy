@@ -11,7 +11,7 @@ namespace Proxy.Shared
             return Encoding.UTF8.GetBytes(serializedMessage);
         }
 
-        public static MicroserviceMessage ToMicroserviceMessage(this byte[] data)
+        public static MicroserviceMessage? ToMicroserviceMessage(this byte[] data)
         {
             return JsonConvert.DeserializeObject<MicroserviceMessage>(Encoding.UTF8.GetString(data));
         }

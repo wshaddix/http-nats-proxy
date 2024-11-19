@@ -2,6 +2,6 @@
 {
     public class Observer
     {
-        public string Subject { get; set; }
+        public required string Subject { get; set; }
     }
 }

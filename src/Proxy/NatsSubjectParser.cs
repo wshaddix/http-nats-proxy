@@ -4,7 +4,7 @@ namespace Proxy
 {
     internal static class NatsSubjectParser
     {
-        internal static string Parse(string httpMethod, string urlPath)
+        internal static string? Parse(string httpMethod, string urlPath)
         {
             // replace all forward slashes with periods in the http request path
             var subjectPath = urlPath.Replace('/', '.').TrimEnd('.');

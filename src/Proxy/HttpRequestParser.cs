@@ -1,19 +1,14 @@
-﻿using Microsoft.AspNetCore.Http;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
+﻿using System.Text;
 
 namespace Proxy
 {
     internal class HttpRequestParser
     {
-        public static string ParseBody(Stream requestBody)
+        public static async Task<string> ParseBodyAsync(Stream requestBody)
         {
             // if there is a body with the request then read it
-            using (var reader = new StreamReader(requestBody, Encoding.UTF8))
-            {
-                return reader.ReadToEnd();
-            }
+            using var reader = new StreamReader(requestBody, Encoding.UTF8);
+            return await reader.ReadToEndAsync();
         }
 
         public static Dictionary<string, object> ParseCookies(IRequestCookieCollection requestCookies)
@@ -34,7 +29,7 @@ namespace Proxy
 
             foreach (var header in requestHeaders)
             {
-                headers.Add(header.Key, string.Join(',', header.Value));
+                headers.Add(header.Key, string.Join(',', header.Value.ToString()));
             }
 
             return headers;
@@ -46,7 +41,7 @@ namespace Proxy
 
             foreach (var param in requestQuery)
             {
-                queryParams.Add(param.Key, string.Join(',', param.Value));
+                queryParams.Add(param.Key, string.Join(',', param.Value.ToString()));
             }
 
             return queryParams;

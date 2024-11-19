@@ -1,17 +1,13 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using NATS.Client;
+﻿using NATS.Client;
 using Serilog;
-using System;
 using System.Net;
 
 namespace Proxy
 {
     public class Program
     {
-        private static ProxyConfiguration _config;
-        private static IWebHost _host;
+        private static ProxyConfiguration? _config;
+        private static IWebHost? _host;
 
         public static void Main(string[] args)
         {
@@ -28,7 +24,7 @@ namespace Proxy
             ConfigureWebHost();
 
             // run the host
-            _host.Run();
+            _host?.Run();
         }
 
         private static void ConfigureEnvironment()
@@ -76,14 +72,16 @@ namespace Proxy
 
         private static void ConfigureWebHost()
         {
+            Proxy.Shared.Guard.AgainstNull(_config);
+
             // create the request handler
-            var requestHandler = new RequestHandler(_config);
+            var requestHandler = new RequestHandler(_config!);
 
             _host = new WebHostBuilder()
                 .UseKestrel(options =>
                 {
-                    // tell Kestrel to listen on all ip addresses at the specififed port
-                    options.Listen(IPAddress.Any, int.Parse(_config.Port));
+                    // tell Kestrel to listen on all ip addresses at the specified port
+                    options.Listen(IPAddress.Any, int.Parse(_config!.Port));
                 })
                 .ConfigureServices(services =>
                 {
@@ -95,8 +93,8 @@ namespace Proxy
                             builder
                                 .AllowAnyHeader()
                                 .AllowAnyMethod()
-                                .AllowAnyOrigin()
-                                .AllowCredentials();
+                                .AllowAnyOrigin();
+                            //.AllowCredentials();
                         });
                     });
                 })
@@ -113,7 +111,9 @@ namespace Proxy
 
         private static void ConnectToNats()
         {
-            Log.Information("Attempting to connect to NATS server at: {NatsUrl}", _config.NatsUrl);
+            Shared.Guard.AgainstNull(_config);
+
+            Log.Information("Attempting to connect to NATS server at: {NatsUrl}", _config!.NatsUrl);
 
             // create a connection to the NATS server
             var connectionFactory = new ConnectionFactory();
@@ -124,23 +124,23 @@ namespace Proxy
             options.MaxPingsOut = 2;
             options.AsyncErrorEventHandler += (sender, args) =>
             {
-                Log.Information("The AsyncErrorEvent was just handled.");
+                Log.Information("The AsyncErrorEvent was just handled");
             };
             options.ClosedEventHandler += (sender, args) =>
             {
-                Log.Information("The ClosedEvent was just handled.");
+                Log.Information("The ClosedEvent was just handled");
             };
             options.DisconnectedEventHandler += (sender, args) =>
             {
-                Log.Information("The DisconnectedEvent was just handled.");
+                Log.Information("The DisconnectedEvent was just handled");
             };
             options.ReconnectedEventHandler += (sender, args) =>
             {
-                Log.Information("The ReconnectedEvent was just handled.");
+                Log.Information("The ReconnectedEvent was just handled");
             };
             options.ServerDiscoveredEventHandler += (sender, args) =>
             {
-                Log.Information("The ServerDiscoveredEvent was just handled.");
+                Log.Information("The ServerDiscoveredEvent was just handled");
             };
             options.Name = "http-nats-proxy";
             _config.NatsConnection = connectionFactory.CreateConnection(options);

@@ -1,12 +1,8 @@
 ﻿using NATS.Client;
 using Newtonsoft.Json;
 using Proxy.Shared;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Proxy
 {
@@ -60,7 +56,14 @@ namespace Proxy
         {
             // the NATS msg.Data property is a json encoded instance of our MicroserviceMessage so we convert it from a byte[] to a string and then
             // deserialize it from json
-            return JsonConvert.DeserializeObject<MicroserviceMessage>(Encoding.UTF8.GetString(reply.Data));
+            var message = JsonConvert.DeserializeObject<MicroserviceMessage>(Encoding.UTF8.GetString(reply.Data));
+
+            if (message is null)
+            {
+                throw new Exception("The NATS reply message is not a valid MicroserviceMessage");
+            }
+
+            return message;
         }
 
         private static void MergeMessageProperties(MicroserviceMessage message, MicroserviceMessage responseMessage)

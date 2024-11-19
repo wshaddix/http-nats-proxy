@@ -66,3 +66,13 @@
 * updated projects target framework to .Net Core 2.2
 * merged in PR to fix parsing of extended properties during pipeline execution (thanks to https://github.com/timsmid)
 * updated all nuget dependencies
+
+## 1.2.0
+
+* Updated to .Net 9
+* Migrated to centralized package management
+* Updated log messages to follow best practices (no trailing period)
+* Fixed typo in code comment
+* Added additional error handling and null checks
+* Updated any outdated or vulnerable NuGet packages
+* Updated Dockerfile to latest versions and addressed scout vulnerabilities

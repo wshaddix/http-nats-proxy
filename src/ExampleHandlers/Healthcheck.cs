@@ -1,12 +1,16 @@
 ﻿using Proxy.Shared;
-using System.Threading.Tasks;
 
 namespace ExampleHandlers
 {
     public class Healthcheck : IMessageHandler
     {
-        async Task<MicroserviceMessage> IMessageHandler.HandleAsync(MicroserviceMessage msg)
+        async Task<MicroserviceMessage> IMessageHandler.HandleAsync(MicroserviceMessage? msg)
         {
+            if (msg is null)
+            {
+                throw new Exception("msg is null");
+            }
+
             // simulate code to go check connections to infrastructure dependencies like a database, redis cache, 3rd party api, etc
             await Task.Delay(1000);
 

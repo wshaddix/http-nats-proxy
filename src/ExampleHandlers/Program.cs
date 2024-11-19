@@ -1,28 +1,30 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Proxy.Shared;
 using Serilog;
-using System;
-using System.Threading;
 
 namespace ExampleHandlers
 {
     internal class Program
     {
         private static readonly ManualResetEvent _mre = new ManualResetEvent(false);
-        private static IServiceProvider _container;
+        private static IServiceProvider? _container;
 
         private static void ConfigureNatsSubscriptions()
         {
             Log.Information("Configuring NATS Subscriptions");
 
             // create the nats subscription handler
+            if (_container is null)
+            {
+                throw new Exception("container is null");
+            }
             var subscriptionHandler = new NatsSubscriptionHandler(_container);
             const string queueGroup = "Example.Queue.Group";
 
             NatsHelper.Configure(cfg =>
             {
                 cfg.ClientName = "Example Message Handlers";
-                cfg.NatsServerUrls = new[] { "nats://localhost:4222" };
+                cfg.NatsServerUrls = ["nats://localhost:4222"];
                 cfg.PingInterval = 2000;
                 cfg.MaxPingsOut = 2;
 
@@ -53,7 +55,7 @@ namespace ExampleHandlers
             // configure our ioc container
             SetupDependencies();
 
-            // setup an event handler that will run when our application process shuts down
+            // set up an event handler that will run when our application process shuts down
             SetupShutdownHandler();
 
             // configure our NATS subscriptions that we are going to listen to
@@ -90,10 +92,10 @@ namespace ExampleHandlers
 
         private static void SetupShutdownHandler()
         {
-            Console.CancelKeyPress += (s, e) =>
+            Console.CancelKeyPress += (_, _) =>
             {
                 // log that we are shutting down
-                Log.Information("Example Handlers are shutting down.");
+                Log.Information("Example Handlers are shutting down");
 
                 // shutdown the logger
                 Log.CloseAndFlush();

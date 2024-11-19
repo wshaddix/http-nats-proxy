@@ -1,12 +1,16 @@
 ﻿using Proxy.Shared;
-using System.Threading.Tasks;
 
 namespace ExampleHandlers
 {
     public class GetCustomer : IMessageHandler
     {
-        public async Task<MicroserviceMessage> HandleAsync(MicroserviceMessage msg)
+        public async Task<MicroserviceMessage> HandleAsync(MicroserviceMessage? msg)
         {
+            if (msg is null)
+            {
+                throw new Exception("msg is null");
+            }
+
             // grab the customer id that is being fetched
             if (msg.TryGetParam<string>("id", out var customerId))
             {

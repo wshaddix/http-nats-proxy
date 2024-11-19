@@ -1,5 +1,5 @@
 version: '3.6'
-
+name: http-nats-proxy
 services:
   nats:
     image: nats:1.4.1

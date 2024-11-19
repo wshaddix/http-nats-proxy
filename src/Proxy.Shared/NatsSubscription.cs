@@ -1,5 +1,4 @@
 ﻿using NATS.Client;
-using System;
 
 namespace Proxy.Shared
 {

@@ -1,8 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Proxy.Shared;
-using System;
-using System.Threading.Tasks;
 
 namespace Proxy
 {
@@ -14,11 +11,16 @@ namespace Proxy
         public RequestHandler(ProxyConfiguration config)
         {
             _config = config;
-            _pipelineExecutor = new PipelineExecutor(natsConnection: _config.NatsConnection,
+
+            Guard.AgainstNull(_config.NatsConnection);
+            Guard.AgainstNull(_config.IncomingPipeline);
+            Guard.AgainstNull(_config.OutgoingPipeline);
+
+            _pipelineExecutor = new PipelineExecutor(natsConnection: _config.NatsConnection!,
                                                      jsonSerializerSettings: _config.JsonSerializerSettings,
                                                      timeout: _config.Timeout,
-                                                     incomingPipeline: _config.IncomingPipeline,
-                                                     outgoingPipeline: _config.OutgoingPipeline,
+                                                     incomingPipeline: _config.IncomingPipeline!,
+                                                     outgoingPipeline: _config.OutgoingPipeline!,
                                                      observers: _config.Observers);
         }
 
@@ -29,7 +31,7 @@ namespace Proxy
             try
             {
                 // create a nats message from the http request
-                CreateNatsMsgFromHttpRequest(context.Request, message);
+                await CreateNatsMsgFromHttpRequestAsync(context.Request, message);
 
                 // execute the request pipeline
                 await _pipelineExecutor.ExecutePipelineAsync(message).ConfigureAwait(false);
@@ -74,19 +76,24 @@ namespace Proxy
             }
         }
 
-        private static void CreateNatsMsgFromHttpRequest(HttpRequest httpRequest, MicroserviceMessage message)
+        private static async Task CreateNatsMsgFromHttpRequestAsync(HttpRequest httpRequest, MicroserviceMessage message)
         {
             // create a NATS subject from the request method and path
+            if (httpRequest.Path.Value is null)
+            {
+                throw new Exception("httpRequest.Path.Value is null");
+            }
+
             message.Subject = NatsSubjectParser.Parse(httpRequest.Method, httpRequest.Path.Value);
 
             // parse the request headers, cookies, query params and body and put them on the message
-            ParseHttpRequest(httpRequest, message);
+            await ParseHttpRequestAsync(httpRequest, message);
         }
 
-        private static void ParseHttpRequest(HttpRequest request, MicroserviceMessage message)
+        private static async Task ParseHttpRequestAsync(HttpRequest request, MicroserviceMessage message)
         {
             // parse the http request body
-            message.RequestBody = HttpRequestParser.ParseBody(request.Body);
+            message.RequestBody = await HttpRequestParser.ParseBodyAsync(request.Body);
 
             // parse the request headers
             message.RequestHeaders = HttpRequestParser.ParseHeaders(request.Headers);
