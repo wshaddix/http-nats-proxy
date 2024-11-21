@@ -3,6 +3,7 @@ using NATS.Client;
 using Proxy.Shared;
 using Serilog;
 using Serilog.Events;
+using Serilog.Formatting.Compact;
 
 namespace Proxy;
 
@@ -74,8 +75,9 @@ public class Program
 
         // create the logging configuration
         var loggerConfiguration = new LoggerConfiguration()
+            .Enrich.FromLogContext()
             .MinimumLevel.Is(logLevel)
-            .WriteTo.Console();
+            .WriteTo.Console(new CompactJsonFormatter());
 
         // set any log properties that are configured
         // these should be in the format of property=value,property=value,property=value
