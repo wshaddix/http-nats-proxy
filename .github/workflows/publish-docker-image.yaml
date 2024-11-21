@@ -22,6 +22,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          file: src/Dockerfile
+          file: Dockerfile
           context: "{{defaultContext}}:src"
           tags: wshaddix/http-nats-proxy:${{ github.ref_name }}
