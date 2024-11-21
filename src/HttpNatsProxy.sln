@@ -13,6 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Dockerfile = Dockerfile
 		global.json = global.json
 		..\README.md = ..\README.md
+		Directory.Packages.props = Directory.Packages.props
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proxy.Shared", "Proxy.Shared\Proxy.Shared.csproj", "{16ADB926-350D-4A8A-AFED-C51E2321FFA0}"

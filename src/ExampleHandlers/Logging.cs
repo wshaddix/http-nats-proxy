@@ -1,17 +1,15 @@
 ﻿using Newtonsoft.Json;
 using Proxy.Shared;
 using Serilog;
-using System.Threading.Tasks;
 
-namespace ExampleHandlers
+namespace ExampleHandlers;
+
+public class Logging : IMessageObserver
 {
-    public class Logging : IMessageObserver
+    public Task ObserveAsync(MicroserviceMessage? msg)
     {
-        public Task ObserveAsync(MicroserviceMessage msg)
-        {
-            Log.Information(JsonConvert.SerializeObject(msg));
+        Log.Information("{Message}", JsonConvert.SerializeObject(msg));
 
-            return Task.FromResult(true);
-        }
+        return Task.FromResult(true);
     }
 }

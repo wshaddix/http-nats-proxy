@@ -1,92 +1,72 @@
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
 
-namespace Proxy.Shared
+namespace Proxy.Shared;
+
+public sealed class MicroserviceMessage(string host, string contentType)
 {
-    public sealed class MicroserviceMessage
+    public List<CallTiming> CallTimings { get; set; } = new();
+    public long CompletedOnUtc { get; set; }
+    public Dictionary<string, object> Cookies { get; set; } = new();
+    public string? ErrorMessage { get; set; }
+    public long ExecutionTimeMs => CompletedOnUtc - StartedOnUtc;
+    public Dictionary<string, object> ExtendedProperties { get; set; } = new();
+    public string Host { get; set; } = host;
+    public Dictionary<string, object> QueryParams { get; set; } = new();
+    public string? RequestBody { get; set; }
+    public Dictionary<string, object> RequestHeaders { get; set; } = new();
+    public string? ResponseBody { get; set; }
+    public string ResponseContentType { get; set; } = contentType;
+    public Dictionary<string, object> ResponseHeaders { get; set; } = new();
+    public int ResponseStatusCode { get; set; } = -1;
+    public bool ShouldTerminateRequest { get; set; }
+    public long StartedOnUtc { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    public string? Subject { get; set; }
+
+    // capture the time in epoch utc that this message was started
+    // default the response status code to an invalid value for comparison later on when the response is being processed by the RequestHandler
+    // capture the host machine that we're executing on
+    // capture the content type for the http response that we're configured for
+    // initialize the default properties
+
+    public void MarkComplete()
     {
-        public List<CallTiming> CallTimings { get; set; }
-        public long CompletedOnUtc { get; set; }
-        public Dictionary<string, object> Cookies { get; set; }
-        public string ErrorMessage { get; set; }
-        public long ExecutionTimeMs => CompletedOnUtc - StartedOnUtc;
-        public Dictionary<string, object> ExtendedProperties { get; set; }
-        public string Host { get; set; }
-        public Dictionary<string, object> QueryParams { get; set; }
-        public string RequestBody { get; set; }
-        public Dictionary<string, object> RequestHeaders { get; set; }
-        public string ResponseBody { get; set; }
-        public string ResponseContentType { get; set; }
-        public Dictionary<string, object> ResponseHeaders { get; set; }
-        public int ResponseStatusCode { get; set; }
-        public bool ShouldTerminateRequest { get; set; }
-        public long StartedOnUtc { get; set; }
-        public string Subject { get; set; }
+        CompletedOnUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    }
 
-        public MicroserviceMessage(string host, string contentType)
+    public void SetResponse(object response)
+    {
+        ResponseBody = JsonConvert.SerializeObject(response);
+    }
+
+    public bool TryGetParam<T>(string key, out T? value)
+    {
+        // try to find a parameter with matching name across the cookies, query parameters, request headers and extended properties
+        if (QueryParams.TryGetValue(key, out var queryParamValue))
         {
-            // capture the time in epoch utc that this message was started
-            StartedOnUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-            // default the response status code to an invalid value for comparison later on when the response is being processed by the RequestHandler
-            ResponseStatusCode = -1;
-
-            // capture the host machine that we're executing on
-            Host = host;
-
-            // capture the content type for the http response that we're configured for
-            ResponseContentType = contentType;
-
-            // initialize the default properties
-            Cookies = new Dictionary<string, object>();
-            ExtendedProperties = new Dictionary<string, object>();
-            QueryParams = new Dictionary<string, object>();
-            RequestHeaders = new Dictionary<string, object>();
-            ResponseHeaders = new Dictionary<string, object>();
-            CallTimings = new List<CallTiming>();
+            value = (T)queryParamValue;
+            return true;
         }
 
-        public void MarkComplete()
+        if (RequestHeaders.TryGetValue(key, out var headerValue))
         {
-            CompletedOnUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            value = (T)headerValue;
+            return true;
         }
 
-        public void SetResponse(object response)
+        if (Cookies.TryGetValue(key, out var cookieValue))
         {
-            ResponseBody = JsonConvert.SerializeObject(response);
+            value = (T)cookieValue;
+            return true;
         }
 
-        public bool TryGetParam<T>(string key, out T value)
+        if (ExtendedProperties.TryGetValue(key, out var extendedValue))
         {
-            // try to find a parameter with matching name across the cookies, query parameters, request headers and extended properties
-            if (QueryParams.TryGetValue(key, out var queryParamValue))
-            {
-                value = (T)queryParamValue;
-                return true;
-            }
-
-            if (RequestHeaders.TryGetValue(key, out var headerValue))
-            {
-                value = (T)headerValue;
-                return true;
-            }
-
-            if (Cookies.TryGetValue(key, out var cookieValue))
-            {
-                value = (T)cookieValue;
-                return true;
-            }
-
-            if (ExtendedProperties.TryGetValue(key, out var extendedValue))
-            {
-                value = (T)extendedValue;
-                return true;
-            }
-
-            // the parameter doesn't exist so return null/false
-            value = default(T);
-            return false;
+            value = (T)extendedValue;
+            return true;
         }
+
+        // the parameter doesn't exist so return null/false
+        value = default;
+        return false;
     }
 }

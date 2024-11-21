@@ -1,131 +1,109 @@
-﻿using NATS.Client;
+﻿using System.Text;
+using NATS.Client;
 using Newtonsoft.Json;
 using Serilog;
-using System;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Proxy.Shared
+namespace Proxy.Shared;
+
+public static class NatsHelper
 {
-    public static class NatsHelper
+    private static IConnection? _connection;
+
+    public static void Configure(Action<NatsConfiguration> configAction)
     {
-        private static IConnection _connection;
-
-        public static void Configure(Action<NatsConfiguration> configAction)
+        // create a new instance of a configuration
+        var config = new NatsConfiguration
         {
-            // create a new instance of a configuration
-            var config = new NatsConfiguration();
+            NatsServerUrls = []
+        };
 
-            // allow the client to setup the subscriptions, connection name and nats server url
-            configAction(config);
+        // allow the client to set up the subscriptions, connection name and nats server url
+        configAction(config);
 
-            // validate the configuration in case there are any problems
-            config.Validate();
+        // validate the configuration in case there are any problems
+        config.Validate();
 
-            // ensure we are connected to the nats server
-            Connect(config.ClientName, config.NatsServerUrls, config.PingInterval, config.MaxPingsOut);
+        // ensure we are connected to the nats server
+        Connect(config.ClientName, config.NatsServerUrls, config.PingInterval, config.MaxPingsOut);
 
-            // start the subscriptions
-            config.NatsSubscriptions.ForEach(s => _connection.SubscribeAsync(s.Subject, s.QueueGroup, s.Handler).Start());
-        }
+        // start the subscriptions
+        if (_connection is null) throw new InvalidOperationException("The NATS connection is null");
 
-        public static void Publish(MicroserviceMessage message)
-        {
-            Publish(message.Subject, message);
-        }
+        config.NatsSubscriptions.ForEach(s => _connection.SubscribeAsync(s.Subject, s.QueueGroup, s.Handler).Start());
+    }
 
-        public static void Publish(string subject, MicroserviceMessage message)
-        {
-            // validate params
-            if (string.IsNullOrWhiteSpace(subject))
-            {
-                throw new ArgumentNullException(nameof(subject));
-            }
+    public static void Publish(MicroserviceMessage? message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
 
-            if (message == null)
-            {
-                throw new ArgumentNullException(nameof(message));
-            }
+        Publish(message.Subject, message);
+    }
 
-            // serialize the message
-            var serializedMessage = JsonConvert.SerializeObject(message);
+    public static void Publish(string? subject, MicroserviceMessage? message)
+    {
+        // validate params
+        if (string.IsNullOrWhiteSpace(subject)) throw new ArgumentNullException(nameof(subject));
 
-            // send the message
-            _connection.Publish(subject, Encoding.UTF8.GetBytes(serializedMessage));
-        }
+        ArgumentNullException.ThrowIfNull(message);
 
-        public static Task<MicroserviceMessage> RequestAsync(MicroserviceMessage message)
-        {
-            return RequestAsync(message.Subject, message);
-        }
+        // serialize the message
+        var serializedMessage = JsonConvert.SerializeObject(message);
 
-        public static async Task<MicroserviceMessage> RequestAsync(string subject, MicroserviceMessage message)
-        {
-            // validate params
-            if (string.IsNullOrWhiteSpace(subject))
-            {
-                throw new ArgumentNullException(nameof(subject));
-            }
+        // send the message
+        if (_connection is null) throw new InvalidOperationException("The NATS connection is null");
 
-            if (message == null)
-            {
-                throw new ArgumentNullException(nameof(message));
-            }
+        _connection.Publish(subject, Encoding.UTF8.GetBytes(serializedMessage));
+    }
 
-            // serialize the message
-            var serializedMessage = JsonConvert.SerializeObject(message);
+    public static Task<MicroserviceMessage?> RequestAsync(MicroserviceMessage message)
+    {
+        return RequestAsync(message.Subject, message);
+    }
 
-            // send the message
-            var response = await _connection.RequestAsync(subject, Encoding.UTF8.GetBytes(serializedMessage)).ConfigureAwait(false);
+    private static async Task<MicroserviceMessage?> RequestAsync(string? subject, MicroserviceMessage message)
+    {
+        // validate params
+        if (string.IsNullOrWhiteSpace(subject)) throw new ArgumentNullException(nameof(subject));
 
-            // return the response as a Microservice message
-            return response.Data.ToMicroserviceMessage();
-        }
+        ArgumentNullException.ThrowIfNull(message);
 
-        private static void Connect(string clientName, string[] natsServerUrls, int pingInterval, int maxPingsOut)
-        {
-            // the params are validated in the Configure method so we don't need to revalidate here
+        // serialize the message
+        var serializedMessage = JsonConvert.SerializeObject(message);
 
-            // if we're already connected to the nats server then do nothing
-            if (null != _connection && _connection.State == ConnState.CONNECTED)
-            {
-                return;
-            }
+        // send the message
+        if (_connection is null) throw new InvalidOperationException("The NATS connection is null");
 
-            // configure the options for this connection
-            var connectionFactory = new ConnectionFactory();
-            var options = ConnectionFactory.GetDefaultOptions();
-            options.Name = clientName;
-            options.AllowReconnect = true;
-            options.Servers = natsServerUrls;
-            options.PingInterval = pingInterval;
-            options.MaxPingsOut = maxPingsOut;
+        var response = await _connection.RequestAsync(subject, Encoding.UTF8.GetBytes(serializedMessage)).ConfigureAwait(false);
 
-            options.AsyncErrorEventHandler += (sender, args) =>
-            {
-                Log.Information("The AsyncErrorEvent was just handled.");
-            };
-            options.ClosedEventHandler += (sender, args) =>
-            {
-                Log.Information("The ClosedEvent was just handled.");
-            };
-            options.DisconnectedEventHandler += (sender, args) =>
-            {
-                Log.Information("The DisconnectedEvent was just handled.");
-            };
-            options.ReconnectedEventHandler += (sender, args) =>
-            {
-                Log.Information("The ReconnectedEvent was just handled.");
-            };
-            options.ServerDiscoveredEventHandler += (sender, args) =>
-            {
-                Log.Information("The ServerDiscoveredEvent was just handled.");
-            };
+        // return the response as a Microservice message
+        return response.Data.ToMicroserviceMessage();
+    }
 
-            // create a connection to the NATS server
-            _connection = connectionFactory.CreateConnection(options);
+    private static void Connect(string clientName, string[] natsServerUrls, int pingInterval, int maxPingsOut)
+    {
+        // the params are validated in the Configure method so we don't need to revalidate here
 
-            Log.Information("Connected to NATS server.");
-        }
+        // if we're already connected to the nats server then do nothing
+        if (_connection is { State: ConnState.CONNECTED }) return;
+
+        // configure the options for this connection
+        var connectionFactory = new ConnectionFactory();
+        var options = ConnectionFactory.GetDefaultOptions();
+        options.Name = clientName;
+        options.AllowReconnect = true;
+        options.Servers = natsServerUrls;
+        options.PingInterval = pingInterval;
+        options.MaxPingsOut = maxPingsOut;
+
+        options.AsyncErrorEventHandler += (_, _) => { Log.Information("The AsyncErrorEvent was just handled"); };
+        options.ClosedEventHandler += (_, _) => { Log.Information("The ClosedEvent was just handled"); };
+        options.DisconnectedEventHandler += (_, _) => { Log.Information("The DisconnectedEvent was just handled"); };
+        options.ReconnectedEventHandler += (_, _) => { Log.Information("The ReconnectedEvent was just handled"); };
+        options.ServerDiscoveredEventHandler += (_, _) => { Log.Information("The ServerDiscoveredEvent was just handled"); };
+
+        // create a connection to the NATS server
+        _connection = connectionFactory.CreateConnection(options);
+
+        Log.Information("Connected to NATS server");
     }
 }

@@ -1,16 +1,13 @@
-﻿using System.Collections.Generic;
+﻿namespace Proxy;
 
-namespace Proxy
+public class Pipeline
 {
-    public class Pipeline
+    public Pipeline()
     {
-        public List<Observer> Observers { get; set; }
-        public List<Step> Steps { get; set; }
-
-        public Pipeline()
-        {
-            Steps = new List<Step>();
-            Observers = new List<Observer>();
-        }
+        Steps = new List<Step>();
+        Observers = new List<Observer>();
     }
+
+    public List<Observer> Observers { get; set; }
+    public List<Step> Steps { get; set; }
 }

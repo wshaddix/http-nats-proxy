@@ -1,9 +1,6 @@
-﻿using System.Threading.Tasks;
+﻿namespace Proxy.Shared;
 
-namespace Proxy.Shared
+public interface IMessageObserver
 {
-    public interface IMessageObserver
-    {
-        Task ObserveAsync(MicroserviceMessage msg);
-    }
+    Task ObserveAsync(MicroserviceMessage? msg);
 }

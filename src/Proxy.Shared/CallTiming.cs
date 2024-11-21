@@ -1,15 +1,8 @@
-namespace Proxy.Shared
+namespace Proxy.Shared;
+
+public class CallTiming(string? subject, long ellapsedMs)
 {
-    public class CallTiming
-    {
-        public long EllapsedMs { get; set; }
+    public long EllapsedMs { get; set; } = ellapsedMs;
 
-        public string Subject { get; set; }
-
-        public CallTiming(string subject, long ellapsedMs)
-        {
-            Subject = subject;
-            EllapsedMs = ellapsedMs;
-        }
-    }
+    public string? Subject { get; set; } = subject;
 }
