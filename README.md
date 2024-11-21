@@ -114,19 +114,21 @@ observers:
 
 All configuration of the http-nats-proxy is done via environment variables.
 
-| Environment Variable                         | Default Value                   | Description                                                                                                                                                |
-|----------------------------------------------|---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| HTTP_NATS_PROXY_HOST_PORT                    | 5000                            | The port that the http-nats-proxy will listen for incoming http requests on                                                                                |
-| HTTP_NATS_PROXY_NAT_URL                      | nats://localhost:4222           | The NATS url where the http-nats-proxy will send the NATS message to                                                                                       |
+| Environment Variable                         | Default Value                   | Description                                                  |
+| -------------------------------------------- | ------------------------------- | ------------------------------------------------------------ |
+| HTTP_NATS_PROXY_HOST_PORT                    | 5000                            | The port that the http-nats-proxy will listen for incoming http requests on |
+| HTTP_NATS_PROXY_NAT_URL                      | nats://localhost:4222           | The NATS url where the http-nats-proxy will send the NATS message to |
 | HTTP_NATS_PROXY_WAIT_TIMEOUT_SECONDS         | 10                              | The number of seconds that the http-nats-proxy will wait for a response from the microservice backend before it returns a Timeout Error to the http client |
-| HTTP_NATS_PROXY_HEAD_STATUS_CODE             | 200                             | The http status code that will be used for a successful HEAD request                                                                                       |
-| HTTP_NATS_PROXY_PUT_STATUS_CODE              | 201                             | The http status code that will be used for a successful PUT request                                                                                        |
-| HTTP_NATS_PROXY_GET_STATUS_CODE              | 200                             | The http status code that will be used for a successful GET request                                                                                        |
-| HTTP_NATS_PROXY_PATCH_STATUS_CODE            | 201                             | The http status code that will be used for a successful PATCH request                                                                                      |
-| HTTP_NATS_PROXY_POST_STATUS_CODE             | 201                             | The http status code that will be used for a successful POST request                                                                                       |
-| HTTP_NATS_PROXY_DELETE_STATUS_CODE           | 204                             | The http status code that will be used for a successful DELETE request                                                                                     |
-| HTTP_NATS_PROXY_CONTENT_TYPE                 | application/json; charset=utf-8 | The http response Content-Type header value. This should be set to whatever messaging format your microservice api supports (xml, json, etc)               |
-| HTTP_NATS_PROXY_REQUEST_PIPELINE_CONFIG_FILE |                                 | The full file path and name of the configuration file that specifies your request pipeline                                                                 |
+| HTTP_NATS_PROXY_HEAD_STATUS_CODE             | 200                             | The http status code that will be used for a successful HEAD request |
+| HTTP_NATS_PROXY_PUT_STATUS_CODE              | 201                             | The http status code that will be used for a successful PUT request |
+| HTTP_NATS_PROXY_GET_STATUS_CODE              | 200                             | The http status code that will be used for a successful GET request |
+| HTTP_NATS_PROXY_PATCH_STATUS_CODE            | 201                             | The http status code that will be used for a successful PATCH request |
+| HTTP_NATS_PROXY_POST_STATUS_CODE             | 201                             | The http status code that will be used for a successful POST request |
+| HTTP_NATS_PROXY_DELETE_STATUS_CODE           | 204                             | The http status code that will be used for a successful DELETE request |
+| HTTP_NATS_PROXY_CONTENT_TYPE                 | application/json; charset=utf-8 | The http response Content-Type header value. This should be set to whatever messaging format your microservice api supports (xml, json, etc) |
+| HTTP_NATS_PROXY_REQUEST_PIPELINE_CONFIG_FILE |                                 | The full file path and name of the configuration file that specifies your request pipeline |
+| LOGGING_LEVEL                                | Verbose                         | Verbose<br />Debug<br />Information<br />Warning<br />Error<br />Fatal |
+| LOGGING_PROPERTIES                           |                                 | A comma separated list of name/value pairs that will be set as properties on the Serilog log messages |
 
 ## Running the Demo
 
