@@ -21,7 +21,7 @@ RUN dotnet publish ./Proxy/Proxy.csproj -c Release -o /publish
 # STAGE 2 - BUILD RUNTIME OPTIMIZED IMAGE
 
 # use the runtime optimized image that does not have any build tools, only the .net core runtime
-FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine-composite
 
 # set the working directory in the image as "app"
 WORKDIR /app
