@@ -23,5 +23,5 @@ jobs:
         with:
           push: true
           file: src/Dockerfile
-          context: src
+          context: "{{defaultContext}}:src"
           tags: wshaddix/http-nats-proxy:${{ github.ref_name }}
