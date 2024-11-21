@@ -11,7 +11,6 @@ WORKDIR /app
 COPY ./Proxy/Proxy.csproj ./Proxy/Proxy.csproj
 COPY ./Proxy.Shared/Proxy.Shared.csproj ./Proxy.Shared/Proxy.Shared.csproj
 RUN dotnet restore ./Proxy/Proxy.csproj
-# RUN dotnet restore ./Proxy.Shared/Proxy.Shared.csproj
 
 # copy the rest of the code
 COPY . ./

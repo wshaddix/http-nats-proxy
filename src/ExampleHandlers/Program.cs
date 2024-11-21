@@ -2,104 +2,100 @@
 using Proxy.Shared;
 using Serilog;
 
-namespace ExampleHandlers
+namespace ExampleHandlers;
+
+internal class Program
 {
-    internal class Program
+    private static readonly ManualResetEvent _mre = new(false);
+    private static IServiceProvider? _container;
+
+    private static void ConfigureNatsSubscriptions()
     {
-        private static readonly ManualResetEvent _mre = new ManualResetEvent(false);
-        private static IServiceProvider? _container;
+        Log.Information("Configuring NATS Subscriptions");
 
-        private static void ConfigureNatsSubscriptions()
+        // create the nats subscription handler
+        if (_container is null) throw new Exception("container is null");
+        var subscriptionHandler = new NatsSubscriptionHandler(_container);
+        const string queueGroup = "Example.Queue.Group";
+
+        NatsHelper.Configure(cfg =>
         {
-            Log.Information("Configuring NATS Subscriptions");
+            cfg.ClientName = "Example Message Handlers";
+            cfg.NatsServerUrls = ["nats://localhost:4222"];
+            cfg.PingInterval = 2000;
+            cfg.MaxPingsOut = 2;
 
-            // create the nats subscription handler
-            if (_container is null)
-            {
-                throw new Exception("container is null");
-            }
-            var subscriptionHandler = new NatsSubscriptionHandler(_container);
-            const string queueGroup = "Example.Queue.Group";
+            // healthcheck (handler of HTTP - GET /healthcheck)
+            cfg.NatsSubscriptions.Add(new NatsSubscription("get.healthcheck", queueGroup, subscriptionHandler.HandleMsgWith<Healthcheck>));
 
-            NatsHelper.Configure(cfg =>
-            {
-                cfg.ClientName = "Example Message Handlers";
-                cfg.NatsServerUrls = ["nats://localhost:4222"];
-                cfg.PingInterval = 2000;
-                cfg.MaxPingsOut = 2;
+            // tracing (handler as a pipeline step)
+            cfg.NatsSubscriptions.Add(new NatsSubscription("add.tracing", queueGroup, subscriptionHandler.HandleMsgWith<Tracing>));
 
-                // healthcheck (handler of HTTP - GET /healthcheck)
-                cfg.NatsSubscriptions.Add(new NatsSubscription("get.healthcheck", queueGroup, subscriptionHandler.HandleMsgWith<Healthcheck>));
+            // metrics (observer as a pipeline step)
+            cfg.NatsSubscriptions.Add(new NatsSubscription("record.metrics", queueGroup, subscriptionHandler.ObserveMsgWith<Metrics>));
 
-                // tracing (handler as a pipeline step)
-                cfg.NatsSubscriptions.Add(new NatsSubscription("add.tracing", queueGroup, subscriptionHandler.HandleMsgWith<Tracing>));
+            // logging (observer as a pipeline step)
+            cfg.NatsSubscriptions.Add(new NatsSubscription("logging", queueGroup, subscriptionHandler.ObserveMsgWith<Logging>));
 
-                // metrics (observer as a pipeline step)
-                cfg.NatsSubscriptions.Add(new NatsSubscription("record.metrics", queueGroup, subscriptionHandler.ObserveMsgWith<Metrics>));
+            // customers (handler of HTTP - Get /customers?id=41)
+            cfg.NatsSubscriptions.Add(new NatsSubscription("get.customers", queueGroup, subscriptionHandler.HandleMsgWith<GetCustomer>));
+        });
 
-                // logging (observer as a pipeline step)
-                cfg.NatsSubscriptions.Add(new NatsSubscription("logging", queueGroup, subscriptionHandler.ObserveMsgWith<Logging>));
+        Log.Information("NATS Subscriptions Configured");
+    }
 
-                // customers (handler of HTTP - Get /customers?id=41)
-                cfg.NatsSubscriptions.Add(new NatsSubscription("get.customers", queueGroup, subscriptionHandler.HandleMsgWith<GetCustomer>));
-            });
+    private static void Main(string[] args)
+    {
+        // setup our logger
+        SetupLogger();
 
-            Log.Information("NATS Subscriptions Configured");
-        }
+        // configure our ioc container
+        SetupDependencies();
 
-        private static void Main(string[] args)
+        // set up an event handler that will run when our application process shuts down
+        SetupShutdownHandler();
+
+        // configure our NATS subscriptions that we are going to listen to
+        ConfigureNatsSubscriptions();
+
+        // run until we're shutdown
+        _mre.WaitOne();
+    }
+
+    private static void SetupDependencies()
+    {
+        // create a new service collection
+        var serviceCollection = new ServiceCollection();
+
+        // scan our assembly for all classes that implement IUseCase and register them with a scoped lifetime
+        serviceCollection.Scan(scan => scan
+            .FromAssembliesOf(typeof(Healthcheck))
+            .AddClasses()
+            .AsSelf()
+            //.AsImplementedInterfaces()
+            .WithScopedLifetime());
+
+        // build the IServiceProvider
+        _container = serviceCollection.BuildServiceProvider();
+    }
+
+    private static void SetupLogger()
+    {
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Information()
+            .WriteTo.Console()
+            .CreateLogger();
+    }
+
+    private static void SetupShutdownHandler()
+    {
+        Console.CancelKeyPress += (_, _) =>
         {
-            // setup our logger
-            SetupLogger();
+            // log that we are shutting down
+            Log.Information("Example Handlers are shutting down");
 
-            // configure our ioc container
-            SetupDependencies();
-
-            // set up an event handler that will run when our application process shuts down
-            SetupShutdownHandler();
-
-            // configure our NATS subscriptions that we are going to listen to
-            ConfigureNatsSubscriptions();
-
-            // run until we're shutdown
-            _mre.WaitOne();
-        }
-
-        private static void SetupDependencies()
-        {
-            // create a new service collection
-            var serviceCollection = new ServiceCollection();
-
-            // scan our assembly for all classes that implement IUseCase and register them with a scoped lifetime
-            serviceCollection.Scan(scan => scan
-                .FromAssembliesOf(typeof(Healthcheck))
-                .AddClasses()
-                .AsSelf()
-                //.AsImplementedInterfaces()
-                .WithScopedLifetime());
-
-            // build the IServiceProvider
-            _container = serviceCollection.BuildServiceProvider();
-        }
-
-        private static void SetupLogger()
-        {
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Information()
-                .WriteTo.Console()
-                .CreateLogger();
-        }
-
-        private static void SetupShutdownHandler()
-        {
-            Console.CancelKeyPress += (_, _) =>
-            {
-                // log that we are shutting down
-                Log.Information("Example Handlers are shutting down");
-
-                // shutdown the logger
-                Log.CloseAndFlush();
-            };
-        }
+            // shutdown the logger
+            Log.CloseAndFlush();
+        };
     }
 }

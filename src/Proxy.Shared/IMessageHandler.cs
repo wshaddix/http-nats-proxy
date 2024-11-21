@@ -1,7 +1,6 @@
-﻿namespace Proxy.Shared
+﻿namespace Proxy.Shared;
+
+public interface IMessageHandler
 {
-    public interface IMessageHandler
-    {
-        Task<MicroserviceMessage> HandleAsync(MicroserviceMessage? msg);
-    }
+    Task<MicroserviceMessage> HandleAsync(MicroserviceMessage? msg);
 }

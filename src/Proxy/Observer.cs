@@ -1,7 +1,6 @@
-﻿namespace Proxy
+﻿namespace Proxy;
+
+public class Observer
 {
-    public class Observer
-    {
-        public required string Subject { get; set; }
-    }
+    public required string Subject { get; set; }
 }

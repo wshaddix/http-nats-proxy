@@ -1,12 +1,11 @@
 ﻿using Proxy.Shared;
 
-namespace Proxy
+namespace Proxy;
+
+internal static class NatsMessageFactory
 {
-    internal static class NatsMessageFactory
+    internal static MicroserviceMessage InitializeMessage(ProxyConfiguration config)
     {
-        internal static MicroserviceMessage InitializeMessage(ProxyConfiguration config)
-        {
-            return new MicroserviceMessage(config.Host, config.ContentType);
-        }
+        return new MicroserviceMessage(config.Host, config.ContentType);
     }
 }
